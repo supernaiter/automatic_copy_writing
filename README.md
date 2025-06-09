@@ -1,47 +1,26 @@
-# 会話継続スクリプト
+# コピージェネレーター
 
-CSVの会話履歴を使ってOpenAI APIで会話を継続するスクリプトです。
+AI（GPT-4o）を活用した効果的なキャッチコピー生成システム
 
-## セットアップ
+## 機能
 
-1. **依存関係をインストール**
+- オリエンテーション入力（企業情報・課題・ターゲット等）
+- 20の効果的なコピーライティングテクニックを活用
+- 5つの厳選されたキャッチコピーを自動生成
+
+## デプロイ
+
+このアプリはStreamlit Cloudで動作します：
+
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-app-url.streamlit.app)
+
+## ローカル実行
+
 ```bash
 pip install -r requirements.txt
+streamlit run streamlit_demo.py
 ```
 
-2. **OpenAI APIキーを設定**
-```bash
-export OPENAI_API_KEY='your-api-key-here'
-```
+## 設定
 
-## 使用方法
-
-```bash
-python continue_conversation.py
-```
-
-## 動作内容
-
-1. `interaction.csv`から会話履歴を読み込み
-2. OpenAI API用の`messages`形式に変換
-3. 「この方向で十個考えてください」をプロンプトとして追加
-4. GPT-4oでJSON形式の回答を生成
-5. 結果を`api_response.json`に保存
-
-## ファイル構成
-
-- `continue_conversation.py` - メインスクリプト
-- `interaction.csv` - 会話履歴データ
-- `requirements.txt` - 依存関係
-- `api_response.json` - 生成された結果（実行後に作成）
-
-## カスタマイズ
-
-スクリプト内の以下の部分を変更可能：
-
-```python
-NEW_PROMPT = "この方向で十個考えてください"  # プロンプト変更
-model="gpt-4o"  # モデル変更
-temperature=0.7  # 創造性調整
-max_tokens=4000  # 最大トークン数
-``` 
+環境変数 `OPENAI_API_KEY` にOpenAI APIキーを設定してください。 

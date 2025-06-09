@@ -1,0 +1,33 @@
+# Virtual environment
+venv/
+env/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.pdf
+*.synctex.gz
+
+# CSV backup files
+*.backup
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# API keys (if using .env)
+.env 
