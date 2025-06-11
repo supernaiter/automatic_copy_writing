@@ -89,6 +89,19 @@ st.set_page_config(
 
 st.markdown("---")
 
+# サイドバー - 会話履歴設定
+st.sidebar.header("📁 会話履歴設定")
+
+# CSVファイル一覧を取得
+csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]
+csv_options = ["履歴なし"] + csv_files
+
+selected_csv = st.sidebar.selectbox(
+    "会話履歴ファイルを選択",
+    csv_options,
+    index=1 if "interaction_copy_focused.csv" in csv_files else 0
+)
+
 # メインエリア
 col1, col2 = st.columns([1, 1])
 
@@ -136,19 +149,6 @@ with col2:
                 file_name="copy_ideas.txt",
                 mime="text/plain"
             )
-
-# サイドバー - 会話履歴設定
-st.sidebar.header("📁 会話履歴設定")
-
-# CSVファイル一覧を取得
-csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]
-csv_options = ["履歴なし"] + csv_files
-
-selected_csv = st.sidebar.selectbox(
-    "会話履歴ファイルを選択",
-    csv_options,
-    index=1 if "interaction_copy_focused.csv" in csv_files else 0
-)
 
 # 選択されたファイルの情報を表示
 if selected_csv != "履歴なし":
