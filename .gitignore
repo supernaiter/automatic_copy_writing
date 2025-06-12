@@ -29,5 +29,9 @@ __pycache__/
 .vscode/
 .idea/
 
-# API keys (if using .env)
-.env 
+# API keys and secrets
+.env
+.streamlit/secrets.toml
+
+# Streamlit cache
+.streamlit/
