@@ -35,3 +35,5 @@ __pycache__/
 
 # Streamlit cache
 .streamlit/
+.streamlit/secrets.toml
+*.env

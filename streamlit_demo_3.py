@@ -9,8 +9,12 @@ import pandas as pd
 from typing import List, Dict, Tuple
 import os
 
-# 固定APIキー設定（環境変数から取得、なければデフォルト値）
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-proj-your-api-key-here")
+# APIキー設定（Streamlit Secrets対応）
+try:
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+except:
+    # ローカル開発時は環境変数から取得
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-proj-your-api-key-here")
 
 # 段階的生成用のプロンプト定義
 STAGED_PROMPTS = [
