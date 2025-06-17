@@ -21,19 +21,19 @@ STAGED_PROMPTS = [
     {
         "stage": 1,
         "title": "🎯 構造化生成",
-        "prompt": "生活者にとって新しい価値を発見できるwhat to say を２０案考えて、その上で二十個のコピーを作成せよ。\n\n※「what to say」とは「メッセージは何か」あるいは、その企画を通して「何を残すのか」「何を持ち帰ってもらうのか」という意味です。",
+        "prompt": "生活者にとって新しい価値を発見できるwhat to say を２０案考えて、その上で二十個のコピーを作成せよ。\n\n※「what to say」とは「メッセージは何か」あるいは、その企画を通して「何を残すのか」「何を持ち帰ってもらうのか」という意味です。\n\n前置きや説明文は不要。コピーのみを出力してください。",
         "description": "20個のwhat to sayと20個のコピーを作成"
     },
     {
         "stage": 2,
         "title": "⚡ 強化・改善",
-        "prompt": "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて",
+        "prompt": "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて\n\n前置きや説明文は不要。コピーのみを出力してください。",
         "description": "より強いメッセージに改善します"
     },
     {
         "stage": 3,
         "title": "✨ 最終洗練",
-        "prompt": "最終的な二十個の案をそれぞれ意味が凝縮するように、短い言葉にリフレーズして",
+        "prompt": "最終的な二十個の案をそれぞれ意味が凝縮するように、短い言葉にリフレーズして\n\n前置きや説明文は不要。コピーのみを出力してください。",
         "description": "意味を凝縮した短いフレーズに最終調整"
     }
 ]
@@ -64,6 +64,29 @@ def get_default_models() -> List[str]:
         "gpt-4o",
         "gpt-4o-mini"
     ]
+
+def clean_response(response: str) -> str:
+    """レスポンスから冗長な前置きを除去"""
+    # 一般的な前置きパターンを除去
+    patterns_to_remove = [
+        r"^もちろんです[。！]*\s*",
+        r"^承知いたしました[。！]*\s*",
+        r"^以下のような.*?です[。！]*\s*",
+        r"^.*?を意識して.*?します[。！]*\s*",
+        r"^.*?再編集します[。！]*\s*",
+        r"^.*?作成します[。！]*\s*",
+        r"^.*?に再編集します[。！]*\s*"
+    ]
+    
+    import re
+    cleaned = response
+    for pattern in patterns_to_remove:
+        cleaned = re.sub(pattern, "", cleaned, flags=re.MULTILINE)
+    
+    # 先頭の空行を除去
+    cleaned = cleaned.lstrip('\n')
+    
+    return cleaned
 
 def get_model_categories() -> Dict[str, Dict]:
     """モデル情報をカテゴリ別に整理"""
@@ -181,19 +204,6 @@ def display_model_selector() -> Tuple[str, str]:
     # 現在選択されているモデル情報を表示
     if selected_model:
         st.sidebar.success(f"✅ 選択中: **{selected_model}**")
-        st.sidebar.info(model_info)
-        
-        # 価格情報を表示
-        for category, models in model_categories.items():
-            if selected_model in models:
-                price_info = models[selected_model]['price']
-                use_case = models[selected_model]['use_case']
-                note_info = models[selected_model].get('note', '')
-                st.sidebar.markdown(f"💰 **価格**: {price_info}")
-                st.sidebar.markdown(f"🎯 **適用例**: {use_case}")
-                if note_info:
-                    st.sidebar.markdown(f"ℹ️ **状態**: {note_info}")
-                break
     
     return selected_model, model_info
 
@@ -258,7 +268,7 @@ def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messa
                 input=user_message,
                 reasoning={"effort": "high"}
             )
-            return response.choices[0].message.content
+            return clean_response(response.choices[0].message.content)
             
         elif is_o3_or_o1_other:
             # その他の推論モデル用の処理
@@ -294,7 +304,9 @@ def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messa
             system_message = {
                 "role": "system", 
                 "content": """あなたは優秀なコピーライターです。
-段階的にコピーを改善していきます。これまでの会話履歴を踏まえて、指示に従ってコピーを作成・改善してください。"""
+段階的にコピーを改善していきます。これまでの会話履歴を踏まえて、指示に従ってコピーを作成・改善してください。
+
+重要：前置きや説明は一切不要です。コピーのみを出力してください。「もちろんです」「以下のような」などの前置きは含めないでください。"""
             }
             
             # 新しいユーザーメッセージを追加
@@ -316,7 +328,7 @@ def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messa
                 max_tokens=1200,
                 temperature=temperature
             )
-            return response.choices[0].message.content
+            return clean_response(response.choices[0].message.content)
             
     except Exception as e:
         error_msg = str(e)
@@ -350,7 +362,7 @@ def generate_copy_ideas(orientation: str, csv_file: str = None, num_ideas: int =
                 reasoning={"effort": "high"}  # o1-pro用のパラメータ
             )
             # Responses APIの正しいレスポンス形式
-            return response.choices[0].message.content
+            return clean_response(response.choices[0].message.content)
             
         elif is_o3_or_o1_other:
             # その他の推論モデル（o1、o3-mini等）用の処理
@@ -369,7 +381,7 @@ def generate_copy_ideas(orientation: str, csv_file: str = None, num_ideas: int =
                 max_completion_tokens=1200
                 # temperatureパラメータは推論モデルでサポートされていない
             )
-            return response.choices[0].message.content
+            return clean_response(response.choices[0].message.content)
         
         else:
             # 標準GPTモデル用の処理
@@ -379,7 +391,7 @@ def generate_copy_ideas(orientation: str, csv_file: str = None, num_ideas: int =
 これまでの会話履歴を踏まえて、与えられたオリエンテーション情報を活用し、効果的なキャッチコピーを作成してください。
 
 出力は簡潔で、インパクトがあり、ターゲットに刺さるものを5個厳選してください。
-コピーのみを出力してください。"""
+重要：前置きや説明は一切不要です。コピーのみを出力してください。「もちろんです」「以下のような」などの前置きは含めないでください。"""
             }
             
             # 新しいユーザーメッセージを追加
@@ -401,7 +413,7 @@ def generate_copy_ideas(orientation: str, csv_file: str = None, num_ideas: int =
                 max_tokens=1200,
                 temperature=temperature
             )
-            return response.choices[0].message.content
+            return clean_response(response.choices[0].message.content)
             
     except Exception as e:
         error_msg = str(e)
@@ -426,49 +438,17 @@ selected_model, model_info = display_model_selector()
 st.sidebar.markdown("---")
 
 # サイドバー - Temperature設定
-st.sidebar.header("🌡️ 創造性設定")
+st.sidebar.header("🎯 マジメレベル")
 temperature = st.sidebar.slider(
-    "Temperature（創造性レベル）",
+    "調整",
     min_value=0.0,
     max_value=1.5,
     value=1.2,
     step=0.1,
-    help="0.0: 一貫性重視 ← → 1.5: 創造性重視（1.5以上は推奨しません）"
+    help="0.0: とてもマジメ ← → 1.5: とてもクリエイティブ"
 )
 
-# Temperature説明
-if temperature <= 0.3:
-    temp_desc = "🔒 非常に一貫性重視（決定論的）"
-    temp_color = "info"
-elif temperature <= 0.6:
-    temp_desc = "📋 やや保守的"
-    temp_color = "info"
-elif temperature <= 1.0:
-    temp_desc = "⚖️ バランス型"
-    temp_color = "success"
-elif temperature <= 1.3:
-    temp_desc = "🎨 創造性重視（推奨）"
-    temp_color = "success"
-else:
-    temp_desc = "⚠️ 非常に創造的（実験的・不安定）"
-    temp_color = "warning"
 
-if temp_color == "warning":
-    st.sidebar.warning(f"現在設定: **{temperature}** - {temp_desc}")
-elif temp_color == "success":
-    st.sidebar.success(f"現在設定: **{temperature}** - {temp_desc}")
-else:
-    st.sidebar.info(f"現在設定: **{temperature}** - {temp_desc}")
-
-# 高いTemperatureの警告
-if temperature > 1.4:
-    st.sidebar.error("⚠️ **警告**: Temperature 1.4以上では意味不明な文字列が生成される可能性があります！")
-    
-# 推奨設定の案内
-st.sidebar.markdown("**💡 推奨設定:**")
-st.sidebar.markdown("• コピーライティング: 0.8 - 1.2")
-st.sidebar.markdown("• 創造的作業: 1.0 - 1.3")
-st.sidebar.markdown("• 一貫性重視: 0.3 - 0.7")
 
 st.sidebar.markdown("---")
 
@@ -607,48 +587,46 @@ if generation_mode == "段階的生成":
                 st.rerun()
     
     with col2:
-        st.subheader("✨ 段階別生成結果")
+        st.subheader("✨ 生成結果")
         
-        # 各段階の結果を表示
+        # 最新の結果のみを表示
         if st.session_state.staged_results:
-            for stage_num, result in st.session_state.staged_results.items():
-                stage_info = STAGED_PROMPTS[stage_num - 1]
-                
-                with st.expander(f"{stage_info['title']} の結果", expanded=True):
-                    st.markdown(f"**プロンプト**: {stage_info['prompt']}")
-                    st.markdown("---")
-                    st.text_area(
-                        f"生成結果 - 段階 {stage_num}",
-                        value=result,
-                        height=300,
-                        key=f"result_display_{stage_num}"
-                    )
-                    
-                    # ボタンを横並びで配置
-                    col_download, col_reflect = st.columns([1, 1])
-                    
-                    with col_download:
-                        # 個別ダウンロードボタン
-                        st.download_button(
-                            label=f"📄 段階{stage_num}の結果をダウンロード",
-                            data=result,
-                            file_name=f"copy_stage_{stage_num}.txt",
-                            mime="text/plain",
-                            key=f"download_{stage_num}"
-                        )
-                    
-                    with col_reflect:
-                        # 自省再生成ボタン
-                        if st.button(
-                            f"🤔 段階{stage_num}を自省して再生成",
-                            key=f"reflect_{stage_num}",
-                            help="現在の結果を自省・改善してより良いコピーを生成します"
-                        ):
-                            # 自省プロンプトを作成
-                            reflect_prompt = f"""
+            # 最新の段階を取得（最も大きい段階番号）
+            latest_stage = max(st.session_state.staged_results.keys())
+            latest_result = st.session_state.staged_results[latest_stage]
+            stage_info = STAGED_PROMPTS[latest_stage - 1]
+            
+            st.markdown(f"**現在の段階**: {stage_info['title']}")
+            st.text_area(
+                "生成結果",
+                value=latest_result,
+                height=400,
+                key="current_result_display"
+            )
+            
+            # ボタンを横並びで配置
+            col_download, col_reflect = st.columns([1, 1])
+            
+            with col_download:
+                # 結果ダウンロードボタン
+                st.download_button(
+                    label="📄 結果をダウンロード",
+                    data=latest_result,
+                    file_name=f"copy_result.txt",
+                    mime="text/plain"
+                )
+            
+            with col_reflect:
+                # 自省再生成ボタン
+                if st.button(
+                    "🤔 自省して再生成",
+                    help="現在の結果を自省・改善してより良いコピーを生成します"
+                ):
+                    # 自省プロンプトを作成
+                    reflect_prompt = f"""
 これまでの結果を自省してください：
 
-{result}
+{latest_result}
 
 上記の結果を客観的に分析し、以下の観点から改善してください：
 1. より印象的で記憶に残るか
@@ -658,51 +636,31 @@ if generation_mode == "段階的生成":
 
 自省の結果を踏まえ、改善されたコピーを生成してください。
 """
-                            
-                            with st.spinner(f"段階{stage_num}を自省して再生成中... (使用モデル: {selected_model})"):
-                                # 自省による再生成
-                                reflected_result = generate_staged_copy(
-                                    st.session_state.staged_orientation,
-                                    reflect_prompt,
-                                    st.session_state.staged_conversation,
-                                    selected_model,
-                                    temperature
-                                )
-                                
-                                # 結果を更新
-                                st.session_state.staged_results[stage_num] = reflected_result
-                                
-                                # 会話履歴も更新（最新の結果で置き換え）
-                                # 該当段階のassistant応答を探して更新
-                                for i, msg in enumerate(st.session_state.staged_conversation):
-                                    if (msg['role'] == 'assistant' and 
-                                        i > 0 and 
-                                        st.session_state.staged_conversation[i-1]['content'] == stage_info['prompt']):
-                                        st.session_state.staged_conversation[i]['content'] = reflected_result
-                                        break
-                                
-                                st.success(f"段階{stage_num}の自省再生成が完了しました！")
-                                st.rerun()
-            
-            # 全結果の統合ダウンロード
-            if len(st.session_state.staged_results) > 0:
-                st.markdown("---")
-                all_results = ""
-                for stage_num in sorted(st.session_state.staged_results.keys()):
-                    stage_info = STAGED_PROMPTS[stage_num - 1]
-                    result = st.session_state.staged_results[stage_num]
-                    all_results += f"=== {stage_info['title']} ===\n"
-                    all_results += f"プロンプト: {stage_info['prompt']}\n\n"
-                    all_results += f"{result}\n\n"
-                    all_results += "=" * 50 + "\n\n"
-                
-                st.download_button(
-                    label="📦 全段階の結果をダウンロード",
-                    data=all_results,
-                    file_name="copy_all_stages.txt",
-                    mime="text/plain",
-                    type="primary"
-                )
+                    
+                    with st.spinner(f"自省して再生成中... (使用モデル: {selected_model})"):
+                        # 自省による再生成
+                        reflected_result = generate_staged_copy(
+                            st.session_state.staged_orientation,
+                            reflect_prompt,
+                            st.session_state.staged_conversation,
+                            selected_model,
+                            temperature
+                        )
+                        
+                        # 結果を更新
+                        st.session_state.staged_results[latest_stage] = reflected_result
+                        
+                        # 会話履歴も更新（最新の結果で置き換え）
+                        # 該当段階のassistant応答を探して更新
+                        for i, msg in enumerate(st.session_state.staged_conversation):
+                            if (msg['role'] == 'assistant' and 
+                                i > 0 and 
+                                st.session_state.staged_conversation[i-1]['content'] == stage_info['prompt']):
+                                st.session_state.staged_conversation[i]['content'] = reflected_result
+                                break
+                        
+                        st.success("自省再生成が完了しました！")
+                        st.rerun()
         else:
             st.info("オリエンテーションを入力して、段階的生成を開始してください。")
 
