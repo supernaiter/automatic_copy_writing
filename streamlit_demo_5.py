@@ -9,6 +9,7 @@ import pandas as pd
 from typing import List, Dict, Tuple
 import os
 import json
+import time
 
 # APIキー設定（Streamlit Secrets対応）
 try:
@@ -17,23 +18,45 @@ except:
     # ローカル開発時は環境変数から取得
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-proj-your-api-key-here")
 
-# 段階的生成用のプロンプト定義
-STAGED_PROMPTS = [
+# コピー生成ブロック定義
+COPY_BLOCKS = [
     {
-        "stage": 1,
-        "title": "🎯 構造化生成",
-        "prompt": "生活者にとって新しい価値を発見できるwhat to say を２０案考えて、その上で二十個のコピーを作成せよ。\n\n※「what to say」とは「メッセージは何か」あるいは、その企画を通して「何を残すのか」「何を持ち帰ってもらうのか」という意味です。",
-        "description": "20個のwhat to sayと20個のコピーを作成"
+        "id": "structured_generation",
+        "title": "適当に書いてみてよ👨",
+        "prompt": """生活者にとって新しい価値を発見できるwhat to say を２０案考えて、その上で二十個のコピーを作成せよ。
+
+※「what to say」とは「メッセージは何か」あるいは、その企画を通して「何を残すのか」「何を持ち帰ってもらうのか」という意味です。
+
+【重要】20個のコピーは以下の異なる方向性で必ず多様化すること：
+
+■感情軸の多様化
+• 共感系（3-4個）：ターゲットの気持ちに寄り添う
+• 発見系（3-4個）：新しい視点や気づきを与える  
+• 驚き系（3-4個）：意外性やインパクトで注目を集める
+• 安心系（3-4個）：信頼感や安全性を重視
+• 挑戦系（3-4個）：前向きな行動を促す
+
+■表現アプローチの多様化
+• 理性訴求（論理的・機能的価値）
+• 感性訴求（情緒的・体験価値）
+• 社会性訴求（社会的意義・環境価値）
+• 個人性訴求（パーソナル・ライフスタイル価値）
+
+■構文パターンの多様化
+• 疑問形、断定形、命令形、感嘆形
+• 体言止め、動詞止め、形容詞止め
+• 短文、中文、対句構造
+
+必ず20個すべてが異なる方向性・アプローチ・表現手法になるように意識して生成すること。"""
     },
     {
-        "stage": 2,
-        "title": "⚡ 強化・改善",
-        "prompt": "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて",
-        "description": "より強いメッセージに改善します"
+        "id": "strengthen_improve",
+        "title": "いまいち、やり直して👨",
+        "prompt": "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて"
     },
     {
-        "stage": 3,
-        "title": "🎨 言い方を変えてみる",
+        "id": "how_to_say",
+        "title": "パンチが欲しいな👨",
         "prompt": """これまでに生成された20個のコピーを、20種類の「How to Say」型を使ってより効果的に洗練してください。
 
 【How to Say型の例】
@@ -58,8 +81,26 @@ STAGED_PROMPTS = [
 19. ライバルに喧嘩を売る
 20. 常識をひっくり返してみる
 
-各コピーに最も適した型を選択し、その型の特徴を活かしてより印象的で記憶に残る表現に洗練してください。""",
-        "description": "20種類のHow to Say型を使って表現を洗練"
+各コピーに最も適した型を選択し、その型の特徴を活かしてより印象的で記憶に残る表現に洗練してください。"""
+    },
+    {
+        "id": "make_shorter",
+        "title": "長い👨",
+        "prompt": """これまでに生成された20個のコピーを分析して、より簡潔で効果的な形に整形してください。
+
+【処理方針】
+1. 各コピーが読点（、）で前半・後半に分かれている場合は、より効果的な方を選択
+2. 読点がない場合は、冗長な部分を削って簡潔にする
+3. メッセージの核心部分を残しつつ、余分な装飾語や修飾語を削除
+4. 短くしてもインパクトが保たれるように調整
+
+【出力指示】
+- 20個すべてのコピーを短縮・整形して出力
+- 元のメッセージ性は保持する
+- より記憶に残りやすい簡潔な表現にする
+- 体言止めや断定的な表現を活用
+
+元のコピーから最も効果的な部分を抽出し、短くても心に響く20個のコピーを作成してください。"""
     }
 ]
 
@@ -417,7 +458,7 @@ def format_copies_display(parsed_json: Dict) -> str:
         
         return formatted
     elif "refinements" in parsed_json:
-        # How to Say洗練用 - 洗練後のコピーのみ表示
+        # How to Say洗練用 - 洗練後のコピーのみ表示（番号なし）
         refinements = parsed_json["refinements"]
         copies = []
         for refinement in refinements:
@@ -425,9 +466,9 @@ def format_copies_display(parsed_json: Dict) -> str:
             if copy:
                 copies.append(copy)
         
-        # 番号付きリストで表示
+        # シンプルに改行区切りで表示
         if copies:
-            return "\n".join([f"{i}. {copy}" for i, copy in enumerate(copies, 1)])
+            return "\n".join(copies)
         else:
             return "洗練されたコピーが生成されませんでした"
     else:
@@ -440,13 +481,203 @@ def format_copies_display(parsed_json: Dict) -> str:
     else:
         return copies[0] if copies else "コピーが生成されませんでした"
 
+def extract_copies_list(parsed_json: Dict) -> List[str]:
+    """パースされたJSONからコピーのリストを抽出"""
+    copies = []
+    
+    if "error" in parsed_json:
+        return []
+    
+    # 様々なJSON構造に対応
+    if "copies" in parsed_json:
+        if isinstance(parsed_json["copies"], list):
+            copies = parsed_json["copies"]
+        else:
+            copies = [str(parsed_json["copies"])]
+    elif "results" in parsed_json:
+        if isinstance(parsed_json["results"], list):
+            copies = parsed_json["results"]
+        else:
+            copies = [str(parsed_json["results"])]
+    elif "what_to_say" in parsed_json and "copies" in parsed_json:
+        # 段階1の構造化生成用 - copiesのみ抽出
+        copy_list = parsed_json.get("copies", [])
+        copies = copy_list
+    elif "refinements" in parsed_json:
+        # How to Say洗練用 - 洗練後のコピーのみ抽出
+        refinements = parsed_json["refinements"]
+        for refinement in refinements:
+            copy = refinement.get("copy", "")
+            if copy:
+                copies.append(copy)
+    else:
+        # その他の構造の場合、全体を文字列として扱う
+        copies = [str(parsed_json)]
+    
+    return copies
+
+def generate_feedback_based_copy(orientation: str, good_copies: List[str], bad_copies: List[str], conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9) -> str:
+    """ユーザーフィードバックを基にした自省的コピー生成"""
+    openai.api_key = OPENAI_API_KEY
+    
+    # モデル種別を判定
+    is_o1_pro = "o1-pro" in model.lower()
+    is_o3_or_o1_other = any(prefix in model.lower() for prefix in ['o1-', 'o3-']) and not is_o1_pro
+    use_json_mode = supports_json_mode(model)
+    
+    # 自省プロンプトを構築
+    good_copies_text = "\n".join([f"✅ {copy}" for copy in good_copies])
+    bad_copies_text = "\n".join([f"❌ {copy}" for copy in bad_copies])
+    
+    self_reflection_prompt = f"""
+【ユーザーフィードバック分析】
+
+以下のコピーについて、ユーザーが選択した良いコピーと選択しなかった悪いコピーを分析してください：
+
+【良いコピー（ユーザーが選択）】
+{good_copies_text}
+
+【悪いコピー（ユーザーが選択しなかった）】
+{bad_copies_text}
+
+【分析タスク】
+1. 良いコピーと悪いコピーの違いを詳細に分析してください
+2. ユーザーが評価した要素（表現、響き、印象、効果など）を特定してください
+3. その分析結果を踏まえて、より良いコピーを20個新たに生成してください
+
+【分析観点】
+- 言葉の選び方
+- 感情的インパクト
+- ターゲットへの響き方
+- 記憶に残りやすさ
+- 独創性
+- 説得力
+- 簡潔さ
+
+分析結果を活用して、ユーザーの好みに合致する新しいコピーを作成してください。
+"""
+    
+    json_instruction = """
+
+回答は必ずJSON形式で出力してください。以下の形式に従ってください：
+
+{
+  "analysis": "良いコピーと悪いコピーの違いの分析結果",
+  "insights": [
+    "洞察1",
+    "洞察2",
+    ...
+  ],
+  "copies": [
+    "改善されたコピー1",
+    "改善されたコピー2",
+    ...（20個）
+  ]
+}
+
+JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力してください。"""
+    
+    try:
+        if is_o1_pro:
+            if conversation_messages:
+                conversation_text = "\n\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_messages])
+                user_message = f"{orientation}\n\n過去の会話:\n{conversation_text}\n\n{self_reflection_prompt}{json_instruction}"
+            else:
+                user_message = f"{orientation}\n\n{self_reflection_prompt}{json_instruction}"
+            
+            response = openai.responses.create(
+                model=model,
+                input=user_message,
+                reasoning={"effort": "high"}
+            )
+            response_text = response.choices[0].message.content
+            
+        elif is_o3_or_o1_other:
+            if conversation_messages:
+                conversation_text = "\n\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_messages])
+                user_message = f"{orientation}\n\n過去の会話:\n{conversation_text}\n\n{self_reflection_prompt}{json_instruction}"
+            else:
+                user_message = f"{orientation}\n\n{self_reflection_prompt}{json_instruction}"
+            
+            messages = [{"role": "user", "content": user_message}]
+            
+            response = openai.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_completion_tokens=3000
+            )
+            response_text = response.choices[0].message.content
+        
+        else:
+            system_message = {
+                "role": "system", 
+                "content": f"""あなたは優秀なコピーライターです。
+ユーザーのフィードバックを詳細に分析し、その洞察を活用してより良いコピーを生成してください。
+良いコピーと悪いコピーの違いを深く理解し、ユーザーの好みに合致する改善されたコピーを作成してください。
+
+重要：生成するコピーは純粋なコピー文言のみを出力してください。説明文、分析、型番号、型名などの余計な情報は一切含めないでください。コピーは完成品として、そのまま広告として使えるものにしてください。{json_instruction}"""
+            }
+            
+            new_user_message = {
+                "role": "user", 
+                "content": f"{orientation}\n\n{self_reflection_prompt}"
+            }
+            
+            messages = [system_message] + conversation_messages + [new_user_message]
+            
+            if use_json_mode:
+                response = openai.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=3000,
+                    temperature=temperature,
+                    response_format={"type": "json_object"}
+                )
+            else:
+                response = openai.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=3000,
+                    temperature=temperature
+                )
+                
+            response_text = response.choices[0].message.content
+        
+        # JSONをパースして結果を返す
+        parsed_json = parse_json_response(response_text)
+        
+        # 分析結果と新しいコピーを整形
+        analysis = parsed_json.get("analysis", "分析結果が取得できませんでした")
+        insights = parsed_json.get("insights", [])
+        copies = parsed_json.get("copies", [])
+        
+        result = f"【🔍 フィードバック分析結果】\n{analysis}\n\n"
+        
+        if insights:
+            result += "【💡 主要な洞察】\n"
+            for i, insight in enumerate(insights, 1):
+                result += f"{i}. {insight}\n"
+            result += "\n"
+        
+        result += "【✨ 改善されたコピー】\n"
+        if copies:
+            for i, copy in enumerate(copies, 1):
+                result += f"{i}. {copy}\n"
+        else:
+            result += "新しいコピーが生成されませんでした\n"
+        
+        return result
+            
+    except Exception as e:
+        return f"エラーが発生しました: {str(e)}"
+
 def supports_json_mode(model: str) -> bool:
     """モデルがJSON Modeをサポートしているかチェック"""
     # o1系、o3系の推論モデルはJSON Modeをサポートしていない
     unsupported_prefixes = ['o1-', 'o3-']
     return not any(prefix in model.lower() for prefix in unsupported_prefixes)
 
-def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9) -> str:
+def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9) -> Tuple[str, Dict]:
     """段階的コピー生成（JSON出力対応）"""
     openai.api_key = OPENAI_API_KEY
     
@@ -523,7 +754,9 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
             system_message = {
                 "role": "system", 
                 "content": f"""あなたは優秀なコピーライターです。
-段階的にコピーを改善していきます。これまでの会話履歴を踏まえて、指示に従ってコピーを作成・改善してください。{json_instruction}"""
+段階的にコピーを改善していきます。これまでの会話履歴を踏まえて、指示に従ってコピーを作成・改善してください。
+
+重要：生成するコピーは純粋なコピー文言のみを出力してください。説明文、分析、型番号、型名などの余計な情報は一切含めないでください。コピーは完成品として、そのまま広告として使えるものにしてください。{json_instruction}"""
             }
             
             new_user_message = {
@@ -554,11 +787,12 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
         
         # JSONをパースして表示用にフォーマット
         parsed_json = parse_json_response(response_text)
-        return format_copies_display(parsed_json)
+        formatted_result = format_copies_display(parsed_json)
+        return formatted_result, parsed_json
             
     except Exception as e:
         error_msg = str(e)
-        return f"エラーが発生しました: {error_msg}"
+        return f"エラーが発生しました: {error_msg}", {}
 
 def generate_how_to_say_refinement(copies: str, orientation: str, model: str = "gpt-4o", temperature: float = 0.9) -> str:
     """HOW TO SAY型を使ってコピーを洗練（JSON出力対応）"""
@@ -605,9 +839,12 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
 【How to Say型一覧】
 {how_to_say_details}
 
-【指示】
+【重要な指示】
 1. 各コピーを分析し、最も適した型（1-20）を判定してください
 2. その型の特徴を活かして、コピーをより効果的に洗練してください
+3. 洗練されたコピーは純粋なコピー文言のみを出力してください
+4. 型番号や型名、説明などの余計な情報は一切含めないでください
+5. 洗練されたコピーは完成品として、そのまま広告として使えるものにしてください
 
 {json_instruction}
 """
@@ -636,7 +873,9 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 "role": "system", 
                 "content": f"""あなたは優秀なコピーライターです。
 与えられたコピーを20種類の「How to Say」型に当てはめて、より効果的に洗練してください。
-各型の特徴を理解し、コピーの本質を保ちながら、より印象的で記憶に残る表現に変換してください。{json_instruction}"""
+各型の特徴を理解し、コピーの本質を保ちながら、より印象的で記憶に残る表現に変換してください。
+
+重要：洗練されたコピーは純粋なコピー文言のみを出力してください。型番号や型名、説明などの余計な情報は一切含めないでください。洗練されたコピーは完成品として、そのまま広告として使えるものにしてください。{json_instruction}"""
             }
             
             messages = [system_message, {"role": "user", "content": prompt}]
@@ -724,7 +963,9 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
             system_message = {
                 "role": "system", 
                 "content": f"""あなたは優秀なコピーライターです。
-これまでの会話履歴を踏まえて、カスタムフィードバックに基づいてコピーを改善・生成してください。{json_instruction}"""
+これまでの会話履歴を踏まえて、カスタムフィードバックに基づいてコピーを改善・生成してください。
+
+重要：生成するコピーは純粋なコピー文言のみを出力してください。説明文、分析、型番号、型名などの余計な情報は一切含めないでください。コピーは完成品として、そのまま広告として使えるものにしてください。{json_instruction}"""
             }
             
             new_user_message = {
@@ -815,7 +1056,9 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 "content": f"""あなたは優秀なコピーライターです。
 これまでの会話履歴を踏まえて、与えられたオリエンテーション情報を活用し、効果的なキャッチコピーを作成してください。
 
-出力は簡潔で、インパクトがあり、ターゲットに刺さるものを{num_ideas}個厳選してください。{json_instruction}"""
+出力は簡潔で、インパクトがあり、ターゲットに刺さるものを{num_ideas}個厳選してください。
+
+重要：生成するコピーは純粋なコピー文言のみを出力してください。説明文、分析、型番号、型名などの余計な情報は一切含めないでください。コピーは完成品として、そのまま広告として使えるものにしてください。{json_instruction}"""
             }
             
             new_user_message = {
@@ -855,12 +1098,58 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
 st.set_page_config(
     page_title="クリエイティブ・ディレクターになろう",
     page_icon="👨",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 st.title("クリエイティブ・ディレクターになろう👨")
-st.markdown("段階的にコピーを改善し、How to Say型で洗練するシステムです。各段階の結果が蓄積されます。")
-st.markdown("🆕 **新機能**: 20種類のHow to Say型を使ったコピー洗練機能を追加！")
+
+# A1明朝フォントの設定
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap');
+
+.copy-display {
+    font-family: 'Noto Serif JP', 'A1明朝', 'ヒラギノ明朝 ProN', 'Hiragino Mincho ProN', '游明朝体', 'Yu Mincho', YuMincho, 'HG明朝E', 'MS P明朝', 'MS PMincho', serif !important;
+    font-size: 16px !important;
+    line-height: 1.8 !important;
+    padding: 10px !important;
+    background-color: #f8f9fa !important;
+    border-radius: 5px !important;
+    border: 1px solid #e9ecef !important;
+    white-space: pre-wrap !important;
+}
+
+/* Streamlit特有のセレクター */
+.stCheckbox > label > div[data-testid="stMarkdownContainer"] > p {
+    font-family: 'Noto Serif JP', 'A1明朝', 'ヒラギノ明朝 ProN', 'Hiragino Mincho ProN', '游明朝体', 'Yu Mincho', YuMincho, 'HG明朝E', 'MS P明朝', 'MS PMincho', serif !important;
+    font-size: 15px !important;
+    line-height: 1.7 !important;
+}
+
+/* チェックボックス全体のラベル */
+.stCheckbox label {
+    font-family: 'Noto Serif JP', 'A1明朝', 'ヒラギノ明朝 ProN', 'Hiragino Mincho ProN', '游明朝体', 'Yu Mincho', YuMincho, 'HG明朝E', 'MS P明朝', 'MS PMincho', serif !important;
+    font-size: 15px !important;
+    line-height: 1.7 !important;
+}
+
+/* textareaの中身も明朝に */
+.stTextArea textarea {
+    font-family: 'Noto Serif JP', 'A1明朝', 'ヒラギノ明朝 ProN', 'Hiragino Mincho ProN', '游明朝体', 'Yu Mincho', YuMincho, 'HG明朝E', 'MS P明朝', 'MS PMincho', serif !important;
+}
+
+/* より具体的なStreamlitセレクター */
+div[data-testid="stMarkdownContainer"] p {
+    font-family: 'Noto Serif JP', 'A1明朝', 'ヒラギノ明朝 ProN', 'Hiragino Mincho ProN', '游明朝体', 'Yu Mincho', YuMincho, 'HG明朝E', 'MS P明朝', 'MS PMincho', serif !important;
+}
+
+/* 全体的なテキスト要素への適用 */
+.element-container div[data-testid="stMarkdownContainer"] {
+    font-family: 'Noto Serif JP', 'A1明朝', 'ヒラギノ明朝 ProN', 'Hiragino Mincho ProN', '游明朝体', 'Yu Mincho', YuMincho, 'HG明朝E', 'MS P明朝', 'MS PMincho', serif !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -876,43 +1165,10 @@ temperature = st.sidebar.slider(
     min_value=0.0,
     max_value=1.5,
     value=1.2,
-    step=0.1,
-    help="0.0: 一貫性重視 ← → 1.5: 創造性重視（1.5以上は推奨しません）"
+    step=0.1
 )
 
-# Temperature説明
-if temperature <= 0.3:
-    temp_desc = "🔒 非常に一貫性重視（決定論的）"
-    temp_color = "info"
-elif temperature <= 0.6:
-    temp_desc = "📋 やや保守的"
-    temp_color = "info"
-elif temperature <= 1.0:
-    temp_desc = "⚖️ バランス型"
-    temp_color = "success"
-elif temperature <= 1.3:
-    temp_desc = "🎨 創造性重視（推奨）"
-    temp_color = "success"
-else:
-    temp_desc = "⚠️ 非常に創造的（実験的・不安定）"
-    temp_color = "warning"
 
-if temp_color == "warning":
-    st.sidebar.warning(f"現在設定: **{temperature}** - {temp_desc}")
-elif temp_color == "success":
-    st.sidebar.success(f"現在設定: **{temperature}** - {temp_desc}")
-else:
-    st.sidebar.info(f"現在設定: **{temperature}** - {temp_desc}")
-
-# 高いTemperatureの警告
-if temperature > 1.4:
-    st.sidebar.error("⚠️ **警告**: Temperature 1.4以上では意味不明な文字列が生成される可能性があります！")
-    
-# 推奨設定の案内
-st.sidebar.markdown("**💡 推奨設定:**")
-st.sidebar.markdown("• コピーライティング: 0.8 - 1.2")
-st.sidebar.markdown("• 創造的作業: 1.0 - 1.3")
-st.sidebar.markdown("• 一貫性重視: 0.3 - 0.7")
 
 st.sidebar.markdown("---")
 
@@ -920,8 +1176,7 @@ st.sidebar.markdown("---")
 st.sidebar.header("🎛️ 生成モード")
 generation_mode = st.sidebar.radio(
     "モードを選択",
-    ["段階的生成", "一括生成"],
-    help="段階的生成：4段階で改善\n一括生成：従来の一度で生成"
+    ["段階的生成", "一括生成"]
 )
 
 # メインエリア
@@ -929,12 +1184,12 @@ if generation_mode == "段階的生成":
     # 段階的生成モード
     
     # セッション状態の初期化
-    if 'staged_results' not in st.session_state:
-        st.session_state.staged_results = {}
-    if 'staged_conversation' not in st.session_state:
-        st.session_state.staged_conversation = []
-    if 'staged_orientation' not in st.session_state:
-        st.session_state.staged_orientation = ""
+    if 'execution_results' not in st.session_state:
+        st.session_state.execution_results = []  # 実行順にブロック結果を格納
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
+    if 'current_orientation' not in st.session_state:
+        st.session_state.current_orientation = ""
     
     col1, col2 = st.columns([1, 1])
     
@@ -958,321 +1213,341 @@ if generation_mode == "段階的生成":
             height=300
         )
         
-        # 段階的生成の進行状況
-        st.markdown("### 🚀 段階的生成（並列実行可能）")
-        
-        # 完了状況を表示
-        completed_stages = len(st.session_state.staged_results)
-        total_stages = len(STAGED_PROMPTS)
-        st.markdown(f"**完了状況**: {completed_stages}/{total_stages} 段階完了")
-        
-        # 各段階のボタン（すべていつでも実行可能）
-        for i, stage_info in enumerate(STAGED_PROMPTS):
-            stage_num = stage_info['stage']
-            
-            # ボタンの状態を決定（すべて実行可能）
-            if stage_num in st.session_state.staged_results:
-                # 既に実行済み
-                button_label = f"🔄 {stage_info['title']} (再実行)"
-                button_type = "secondary"
-            else:
-                # 未実行
-                button_label = f"▶️ {stage_info['title']}"
-                button_type = "primary"
-            
-            col_btn, col_desc = st.columns([1, 2])
-            with col_btn:
-                if st.button(
-                    button_label,
-                    key=f"stage_{stage_num}",
-                    type=button_type
-                ):
-                    if not orientation:
-                        st.error("オリエンテーションを入力してください")
-                    else:
-                        # オリエンテーションを保存
-                        st.session_state.staged_orientation = orientation
-                        
-                        # 初期化（履歴なし）
-                        if not st.session_state.staged_conversation:
-                            st.session_state.staged_conversation = []
-                        
-                        with st.spinner(f"{stage_info['title']}を生成中... (使用モデル: {selected_model})"):
-                            result = generate_staged_copy(
-                                orientation, 
-                                stage_info['prompt'], 
-                                st.session_state.staged_conversation,
-                                selected_model,
-                                temperature
-                            )
-                            
-                        # 結果を保存
-                        st.session_state.staged_results[stage_num] = result
-                        
-                        # 会話履歴に追加または更新
-                        # 既存の同じプロンプトがあるかチェック
-                        found_existing = False
-                        for j, msg in enumerate(st.session_state.staged_conversation):
-                            if (msg['role'] == 'user' and 
-                                msg['content'] == stage_info['prompt']):
-                                # 既存のプロンプト見つかった場合、次のassistant応答を更新
-                                if j + 1 < len(st.session_state.staged_conversation):
-                                    st.session_state.staged_conversation[j + 1]['content'] = result
-                                else:
-                                    st.session_state.staged_conversation.append({
-                                        "role": "assistant", 
-                                        "content": result
-                                    })
-                                found_existing = True
-                                break
-                        
-                        if not found_existing:
-                            # 新しいプロンプトの場合、追加
-                            st.session_state.staged_conversation.append({
-                                "role": "user", 
-                                "content": stage_info['prompt']
-                            })
-                            st.session_state.staged_conversation.append({
-                                "role": "assistant", 
-                                "content": result
-                            })
-                        
-                        st.rerun()
-            
-            with col_desc:
-                st.markdown(f"*{stage_info['description']}*")
-        
-        # カスタムプロンプト機能
         st.markdown("---")
-        st.markdown("### 🎯 カスタムプロンプト実行")
-        st.markdown("自由なフィードバックでコピーを改善できます")
         
-        custom_prompt = st.text_area(
-            "カスタムフィードバック・指示を入力",
-            placeholder="例：もっと感情的で心に響く表現にして\n例：ターゲットを20代女性に絞った表現にして\n例：より短くて覚えやすいフレーズにして",
-            height=100
-        )
-        
-        if st.button("🚀 カスタムプロンプト実行", type="primary"):
-            if not orientation:
-                st.error("オリエンテーションを入力してください")
-            elif not custom_prompt:
-                st.error("カスタムフィードバックを入力してください")
-            else:
-                # オリエンテーションを保存
-                st.session_state.staged_orientation = orientation
+        # 各ブロックを独立実行可能に表示
+        for i, block_info in enumerate(COPY_BLOCKS):
+            block_id = block_info['id']
+            
+            # ブロック表示
+            with st.container():
+                col_btn = st.columns([1])[0]
                 
-                # 会話履歴を初期化（必要に応じて）
-                if not st.session_state.staged_conversation:
-                    st.session_state.staged_conversation = []
-                
-                with st.spinner(f"カスタムプロンプトでコピー生成中... (使用モデル: {selected_model})"):
-                    result = generate_custom_copy(
-                        orientation, 
-                        custom_prompt, 
-                        st.session_state.staged_conversation,
-                        selected_model,
-                        temperature
-                    )
-                    
-                # 結果をセッション状態に保存（カスタムキー使用）
-                st.session_state.custom_result = result
-                
-                # 会話履歴に追加
-                st.session_state.staged_conversation.append({
-                    "role": "user", 
-                    "content": custom_prompt
-                })
-                st.session_state.staged_conversation.append({
-                    "role": "assistant", 
-                    "content": result
-                })
-                
-                st.rerun()
-        
-        # リセットボタン
-        if len(st.session_state.staged_results) > 0 or 'custom_result' in st.session_state:
-            if st.button("🔄 段階的生成をリセット", type="secondary"):
-                st.session_state.staged_results = {}
-                st.session_state.staged_conversation = []
-                st.session_state.staged_orientation = ""
-                if 'custom_result' in st.session_state:
-                    del st.session_state.custom_result
-                st.rerun()
-    
-    with col2:
-        st.subheader("✨ 段階別生成結果")
-        
-        # 各段階の結果を表示
-        if st.session_state.staged_results:
-            for stage_num, result in st.session_state.staged_results.items():
-                stage_info = STAGED_PROMPTS[stage_num - 1]
-                
-                with st.expander(f"{stage_info['title']} の結果", expanded=True):
-                    st.markdown(f"**プロンプト**: {stage_info['prompt']}")
-                    st.markdown("---")
-                    st.text_area(
-                        f"生成結果 - 段階 {stage_num}",
-                        value=result,
-                        height=300,
-                        key=f"result_display_{stage_num}"
-                    )
-                    
-                    # ボタンを横並びで配置
-                    col_download, col_reflect = st.columns([1, 1])
-                    
-                    with col_download:
-                        # 個別ダウンロードボタン
-                        st.download_button(
-                            label=f"📄 段階{stage_num}の結果をダウンロード",
-                            data=result,
-                            file_name=f"copy_stage_{stage_num}.txt",
-                            mime="text/plain",
-                            key=f"download_{stage_num}"
-                        )
-                    
-                    with col_reflect:
-                        # 自省再生成ボタン
-                        if st.button(
-                            f"🤔 段階{stage_num}を自省して再生成",
-                            key=f"reflect_{stage_num}",
-                            help="現在の結果を自省・改善してより良いコピーを生成します"
-                        ):
-                            # 自省プロンプトを作成
-                            reflect_prompt = f"""
-これまでの結果を自省してください：
-
-{result}
-
-上記の結果を客観的に分析し、以下の観点から改善してください：
-1. より印象的で記憶に残るか
-2. ターゲットに刺さる表現になっているか  
-3. 独創性と説得力のバランスは適切か
-4. 簡潔で力強いメッセージになっているか
-
-自省の結果を踏まえ、改善されたコピーを生成してください。
-"""
+                with col_btn:
+                    if st.button(
+                        f"▶️ {block_info['title']}",
+                        key=f"block_{block_id}",
+                        type="primary",
+                        use_container_width=True
+                    ):
+                        if not orientation:
+                            st.error("オリエンテーションを入力してください")
+                        else:
+                            # オリエンテーションを保存
+                            st.session_state.current_orientation = orientation
                             
-                            with st.spinner(f"段階{stage_num}を自省して再生成中... (使用モデル: {selected_model})"):
-                                # 自省による再生成
-                                reflected_result = generate_staged_copy(
-                                    st.session_state.staged_orientation,
-                                    reflect_prompt,
-                                    st.session_state.staged_conversation,
+                            # 選択されたコピーがある場合、プロンプトに追加
+                            enhanced_prompt = block_info['prompt']
+                            if ('unified_selected_copies' in st.session_state and 
+                                st.session_state.unified_selected_copies and 
+                                'accumulated_copies' in st.session_state):
+                                
+                                selected_copies = []
+                                for idx in st.session_state.unified_selected_copies:
+                                    if idx < len(st.session_state.accumulated_copies):
+                                        selected_copies.append(st.session_state.accumulated_copies[idx]['copy'])
+                                
+                                if selected_copies:
+                                    selected_copies_text = '\n'.join([f"• {copy}" for copy in selected_copies])
+                                    enhanced_prompt += f"\n\n【参考】ユーザーが特に気に入っていたコピー：\n{selected_copies_text}\n\nこれらの方向性や表現スタイルも参考にしながら、新しいコピーを生成してください。"
+                            
+                            with st.spinner(f"{block_info['title']}を生成中... (使用モデル: {selected_model})"):
+                                result, raw_json = generate_staged_copy(
+                                    orientation, 
+                                    enhanced_prompt, 
+                                    st.session_state.conversation_history,
                                     selected_model,
                                     temperature
                                 )
                                 
-                                # 結果を更新
-                                st.session_state.staged_results[stage_num] = reflected_result
-                                
-                                # 会話履歴も更新（最新の結果で置き換え）
-                                # 該当段階のassistant応答を探して更新
-                                for i, msg in enumerate(st.session_state.staged_conversation):
-                                    if (msg['role'] == 'assistant' and 
-                                        i > 0 and 
-                                        st.session_state.staged_conversation[i-1]['content'] == stage_info['prompt']):
-                                        st.session_state.staged_conversation[i]['content'] = reflected_result
-                                        break
-                                
-                                st.success(f"段階{stage_num}の自省再生成が完了しました！")
-                                st.rerun()
-            
-            # 全結果の統合ダウンロード
-            if len(st.session_state.staged_results) > 0:
+                            # 実行結果を順番に追加
+                            execution_result = {
+                                'id': block_id,
+                                'title': block_info['title'],
+                                'prompt': enhanced_prompt,
+                                'result': result,
+                                'raw_json': raw_json,
+                                'timestamp': time.time()
+                            }
+                            st.session_state.execution_results.append(execution_result)
+                            
+                            # 会話履歴に追加（シンプル）
+                            st.session_state.conversation_history.append({
+                                "role": "user", 
+                                "content": enhanced_prompt
+                            })
+                            st.session_state.conversation_history.append({
+                                "role": "assistant", 
+                                "content": result
+                            })
+                            
+                            st.rerun()
+                
+
+                
                 st.markdown("---")
+        
+
+        
+        # カスタムブロック
+        with st.container():
+            col_input_custom = st.columns([1])[0]
+            
+            with col_input_custom:
+                custom_prompt = st.text_area(
+                    "カスタムフィードバック・指示を入力",
+                    height=100,
+                    key="custom_prompt_input"
+                )
+                
+                if st.button("カスタム実行", type="primary", use_container_width=True):
+                    if not orientation:
+                        st.error("オリエンテーションを入力してください")
+                    elif not custom_prompt:
+                        st.error("カスタムフィードバックを入力してください")
+                    else:
+                        # オリエンテーションを保存
+                        st.session_state.current_orientation = orientation
+                        
+                        # 選択されたコピーがある場合、プロンプトに追加
+                        enhanced_custom_prompt = custom_prompt
+                        if ('unified_selected_copies' in st.session_state and 
+                            st.session_state.unified_selected_copies and 
+                            'accumulated_copies' in st.session_state):
+                            
+                            selected_copies = []
+                            for idx in st.session_state.unified_selected_copies:
+                                if idx < len(st.session_state.accumulated_copies):
+                                    selected_copies.append(st.session_state.accumulated_copies[idx]['copy'])
+                            
+                            if selected_copies:
+                                selected_copies_text = '\n'.join([f"• {copy}" for copy in selected_copies])
+                                enhanced_custom_prompt += f"\n\n【参考】ユーザーが特に気に入っていたコピー：\n{selected_copies_text}\n\nこれらの方向性や表現スタイルも参考にしながら、新しいコピーを生成してください。"
+                        
+                        with st.spinner(f"カスタムプロンプトでコピー生成中... (使用モデル: {selected_model})"):
+                            result = generate_custom_copy(
+                                orientation, 
+                                enhanced_custom_prompt, 
+                                st.session_state.conversation_history,
+                                selected_model,
+                                temperature
+                            )
+                            
+                        # カスタム実行結果を追加
+                        execution_result = {
+                            'id': 'custom',
+                            'title': 'カスタム実行',
+                            'prompt': enhanced_custom_prompt,
+                            'result': result,
+                            'raw_json': None,
+                            'timestamp': time.time()
+                        }
+                        st.session_state.execution_results.append(execution_result)
+                        
+                        # 会話履歴に追加
+                        st.session_state.conversation_history.append({
+                            "role": "user", 
+                            "content": enhanced_custom_prompt
+                        })
+                        st.session_state.conversation_history.append({
+                            "role": "assistant", 
+                            "content": result
+                        })
+                        
+                        st.rerun()
+                
+
+        
+        st.markdown("---")
+        
+        # リセットボタン
+        if len(st.session_state.execution_results) > 0:
+            st.markdown("### リセット機能")
+            col_reset, col_desc_reset = st.columns([1, 2])
+            
+            with col_reset:
+                if st.button("全実行履歴をリセット", type="secondary", use_container_width=True):
+                    st.session_state.execution_results = []
+                    st.session_state.conversation_history = []
+                    st.session_state.current_orientation = ""
+                    # 新機能のセッション状態もクリア
+                    if 'unified_selected_copies' in st.session_state:
+                        del st.session_state.unified_selected_copies
+                    if 'unified_feedback_result' in st.session_state:
+                        del st.session_state.unified_feedback_result
+                    # 蓄積されたコピーもクリア
+                    if 'accumulated_copies' in st.session_state:
+                        del st.session_state.accumulated_copies
+                    st.rerun()
+            
+
+    
+    with col2:
+        
+        if st.session_state.execution_results:
+            if len(st.session_state.execution_results) > 0:
+                st.markdown("---")
+                st.markdown("## コピー選択")
+                
+                # すべてのコピーを蓄積する形で収集
+                all_copies = []
+                all_source_info = []
+                
+                # セッション状態に蓄積されたコピーを初期化（必要に応じて）
+                if 'accumulated_copies' not in st.session_state:
+                    st.session_state.accumulated_copies = []
+                
+                # 最新の実行結果からコピーを取得
+                if st.session_state.execution_results:
+                    latest_result = st.session_state.execution_results[-1]  # 最後に実行されたもの
+                    if latest_result['raw_json']:
+                        raw_json = latest_result['raw_json']
+                        copies_list = extract_copies_list(raw_json)
+                        
+                        # 蓄積されたコピーリストに最新結果のコピーが含まれていない場合のみ追加
+                        for copy in copies_list:
+                            if copy not in [item['copy'] for item in st.session_state.accumulated_copies]:
+                                st.session_state.accumulated_copies.append({
+                                    'copy': copy,
+                                    'source': latest_result['title'],
+                                    'execution_index': len(st.session_state.execution_results) - 1
+                                })
+                
+                # フィードバック分析結果からコピーを追加
+                if 'unified_feedback_result' in st.session_state:
+                    feedback_text = st.session_state.unified_feedback_result
+                    # フィードバック結果から「改善されたコピー」セクションを抽出
+                    if "【✨ 改善されたコピー】" in feedback_text:
+                        lines = feedback_text.split("\n")
+                        in_copy_section = False
+                        feedback_copies = []
+                        for line in lines:
+                            if "【✨ 改善されたコピー】" in line:
+                                in_copy_section = True
+                                continue
+                            elif line.startswith("【") and in_copy_section:
+                                break
+                            elif in_copy_section and line.strip() and not line.startswith("【"):
+                                # 番号付きの行を抽出
+                                if ". " in line and any(char.isdigit() for char in line.split(". ")[0]):
+                                    copy_text = ". ".join(line.split(". ")[1:]).strip()
+                                    if copy_text:
+                                        feedback_copies.append(copy_text)
+                        
+                        # フィードバックコピーを蓄積リストに追加（重複チェック）
+                        for copy in feedback_copies:
+                            if copy not in [item['copy'] for item in st.session_state.accumulated_copies]:
+                                st.session_state.accumulated_copies.append({
+                                    'copy': copy,
+                                    'source': "フィードバック分析",
+                                    'stage_num': 999  # フィードバック用の特別な番号
+                                })
+                
+                # 蓄積されたコピーをall_copiesに追加（最新20個のみ表示）
+                for item in st.session_state.accumulated_copies[-20:]:  # 最新20個のみ
+                    all_copies.append(item['copy'])
+                    all_source_info.append(item['source'])
+                
+                # セッション状態の初期化
+                if 'unified_selected_copies' not in st.session_state:
+                    st.session_state.unified_selected_copies = []
+                
+                # コピー選択UI
+                if all_copies:
+                    selected_indices = []
+                    
+                    for i, copy in enumerate(all_copies):
+                        if st.checkbox(
+                            f"{copy}",
+                            key=f"unified_checkbox_{i}",
+                            value=i in st.session_state.unified_selected_copies
+                        ):
+                            selected_indices.append(i)
+                    
+                    # 選択状態を更新
+                    st.session_state.unified_selected_copies = selected_indices
+                    
+                    # フィードバック分析ボタン
+                    if len(selected_indices) > 0 and len(selected_indices) < len(all_copies):
+                        good_copies = [all_copies[i] for i in selected_indices]
+                        bad_copies = [all_copies[i] for i in range(len(all_copies)) if i not in selected_indices]
+                        
+                        if st.button(
+                            "改善コピーを生成",
+                            key="unified_analyze_feedback",
+                            type="primary"
+                        ):
+                            with st.spinner("フィードバック分析中..."):
+                                feedback_result = generate_feedback_based_copy(
+                                    st.session_state.current_orientation,
+                                    good_copies,
+                                    bad_copies,
+                                    st.session_state.conversation_history,
+                                    selected_model,
+                                    temperature
+                                )
+                                
+                                # フィードバック結果を保存
+                                st.session_state.unified_feedback_result = feedback_result
+                            
+                            st.success("完了しました")
+                            st.rerun()
+                    
+
+                
+                if 'unified_feedback_result' in st.session_state:
+                    st.download_button(
+                        label="分析結果をダウンロード",
+                        data=st.session_state.unified_feedback_result,
+                        file_name="feedback_analysis_detailed.txt",
+                        mime="text/plain",
+                        key="download_unified_feedback"
+                    )
+                
+                st.markdown("---")
+                
+                # 全実行結果の統合ダウンロード
                 all_results = ""
-                for stage_num in sorted(st.session_state.staged_results.keys()):
-                    stage_info = STAGED_PROMPTS[stage_num - 1]
-                    result = st.session_state.staged_results[stage_num]
-                    all_results += f"=== {stage_info['title']} ===\n"
-                    all_results += f"プロンプト: {stage_info['prompt']}\n\n"
-                    all_results += f"{result}\n\n"
+                for i, execution in enumerate(st.session_state.execution_results):
+                    all_results += f"=== 実行{i+1}: {execution['title']} ===\n"
+                    all_results += f"実行時刻: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(execution['timestamp']))}\n"
+                    all_results += f"プロンプト: {execution['prompt'][:100]}...\n\n"
+                    all_results += f"{execution['result']}\n\n"
                     all_results += "=" * 50 + "\n\n"
                 
                 st.download_button(
-                    label="📦 全段階の結果をダウンロード",
+                    label="全実行結果をダウンロード",
                     data=all_results,
-                    file_name="copy_all_stages.txt",
+                    file_name="copy_all_executions.txt",
                     mime="text/plain",
                     type="primary"
                 )
                 
                 
         
-        # カスタムプロンプト結果の表示
-        if 'custom_result' in st.session_state and st.session_state.custom_result:
+        # 実行履歴の表示
+        if st.session_state.execution_results:
             st.markdown("---")
-            st.markdown("#### 🎯 カスタムプロンプト結果")
-            st.text_area(
-                "カスタムフィードバックに基づく生成結果",
-                value=st.session_state.custom_result,
-                height=300,
-                key="custom_result_display"
-            )
+            st.markdown("## 実行履歴")
             
-            # カスタム結果のダウンロードボタン
-            st.download_button(
-                label="📄 カスタム結果をダウンロード",
-                data=st.session_state.custom_result,
-                file_name="custom_copy_result.txt",
-                mime="text/plain",
-                type="secondary"
-            )
-        else:
-            st.info("オリエンテーションを入力して、段階的生成を開始してください。")
+            # 最新の実行結果を表示
+            latest_execution = st.session_state.execution_results[-1]
+            st.markdown(f"### 最新実行: {latest_execution['title']}")
+            st.markdown(f'<div class="copy-display">{latest_execution["result"]}</div>', unsafe_allow_html=True)
             
-            # 段階的生成がない場合でもHow to Say洗練を使用可能に
-            st.markdown("---")
-            st.markdown("### 🎨 How to Say 洗練（手動入力）")
-            st.markdown("既存のコピーを手動で入力して20種類の型で洗練することもできます")
-            
-            manual_copies = st.text_area(
-                "洗練したいコピーを入力してください（複数可、改行区切り）",
-                height=150,
-                placeholder="例：\nやさしい味で、毎日飲める。\nルイボスなのに、すっきり。\n..."
-            )
-            
-            if manual_copies and st.button(
-                "🎨 手動入力コピーをHow to Say型で洗練する",
-                type="primary",
-                help="入力されたコピーを20種類の型で洗練します"
-            ):
-                if not st.session_state.get('staged_orientation'):
-                    st.error("オリエンテーション情報がありません。左側でオリエンテーションを入力してください。")
-                else:
-                    with st.spinner(f"How to Say型で洗練中... (使用モデル: {selected_model})"):
-                        refinement_result = generate_how_to_say_refinement(
-                            manual_copies,
-                            st.session_state.staged_orientation,
-                            selected_model,
-                            temperature
+            # 実行履歴をリストで表示
+            if len(st.session_state.execution_results) > 1:
+                st.markdown("### 実行履歴一覧")
+                for i, execution in enumerate(reversed(st.session_state.execution_results)):
+                    with st.expander(f"実行{len(st.session_state.execution_results) - i}: {execution['title']} ({time.strftime('%H:%M:%S', time.localtime(execution['timestamp']))})"):
+                        st.markdown(f'<div class="copy-display">{execution["result"]}</div>', unsafe_allow_html=True)
+                        st.download_button(
+                            label=f"ダウンロード - {execution['title']}",
+                            data=execution['result'],
+                            file_name=f"{execution['id']}_result.txt",
+                            mime="text/plain",
+                            key=f"download_{execution['timestamp']}"
                         )
-                        
-                        # 洗練結果をセッション状態に保存
-                        st.session_state.manual_how_to_say_result = refinement_result
-                        
-                    st.success("手動入力コピーのHow to Say洗練が完了しました！")
-                    st.rerun()
-            
-            # 手動入力の洗練結果表示
-            if 'manual_how_to_say_result' in st.session_state and st.session_state.manual_how_to_say_result:
-                st.markdown("#### 🎨 手動入力 How to Say洗練結果")
-                st.text_area(
-                    "型に当てはめた洗練結果",
-                    value=st.session_state.manual_how_to_say_result,
-                    height=400,
-                    key="manual_how_to_say_display"
-                )
-                
-                # 洗練結果のダウンロードボタン
-                st.download_button(
-                    label="📄 手動入力洗練結果をダウンロード",
-                    data=st.session_state.manual_how_to_say_result,
-                    file_name="manual_how_to_say_refinement.txt",
-                    mime="text/plain",
-                    type="secondary"
-                )
 
 else:
     # 一括生成モード（従来版）
@@ -1311,7 +1586,7 @@ else:
                     result = generate_copy_ideas(orientation, None, 5, selected_model, temperature)
                     
                 st.success("生成完了！")
-                st.text_area("生成されたコピー", value=result, height=400)
+                st.markdown(f'<div class="copy-display">{result}</div>', unsafe_allow_html=True)
                 
                 # ダウンロードボタン
                 st.download_button(
@@ -1344,13 +1619,13 @@ if st.sidebar.checkbox("管理者モード", value=False):
                 if model_id in available_models:
                     st.sidebar.write(f"• {model_id}: {model_data['price']}")
     
-    if st.sidebar.button("段階的生成状態表示"):
+    if st.sidebar.button("実行状態表示"):
         if generation_mode == "段階的生成":
             st.sidebar.json({
-                "total_stages": len(STAGED_PROMPTS),
-                "completed_stages": len(st.session_state.get('staged_results', {})),
-                "conversation_length": len(st.session_state.get('staged_conversation', [])),
-                "parallel_execution": True,
+                "available_blocks": len(COPY_BLOCKS),
+                "completed_executions": len(st.session_state.get('execution_results', [])),
+                "conversation_length": len(st.session_state.get('conversation_history', [])),
+                "independent_execution": True,
                 "selected_model": selected_model
             })
         else:
