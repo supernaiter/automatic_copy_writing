@@ -1,0 +1,236 @@
+{
+  "framework_info": {
+    "id": 12,
+    "name": "Copy DNA Audit",
+    "version": "1.0.0",
+    "execution_time": 0.009324073791503906,
+    "timestamp": "2025-06-26T09:53:12.125489"
+  },
+  "input_parameters": {
+    "brand_name": "サンプルブランド",
+    "copy_count": 8,
+    "sample_copies": [
+      "新しい朝が始まる。一杯のコーヒーから。",
+      "美味しさに、こだわり続けて50年。",
+      "あなたの毎日を、もっと素晴らしく！"
+    ]
+  },
+  "basic_statistics": {
+    "total_copies": 8,
+    "character_stats": {
+      "avg": 16.75,
+      "median": 17.0,
+      "min": 15,
+      "max": 19,
+      "std": 1.299038105676658
+    },
+    "word_stats": {
+      "avg": 1.0,
+      "median": 1.0,
+      "std": 0.0
+    },
+    "sentence_stats": {
+      "avg": 2.5,
+      "median": 2.5,
+      "std": 0.5
+    }
+  },
+  "vocabulary_analysis": {
+    "vocabulary_size": 33,
+    "total_words": 38,
+    "vocabulary_richness": 0.868421052631579,
+    "top_words": {
+      "な": 4,
+      "が": 2,
+      "ら": 2,
+      "コ": 1,
+      "ヒ": 1,
+      "新": 1,
+      "朝": 1,
+      "始": 1,
+      "一杯": 1,
+      "美味": 1,
+      "続": 1,
+      "年": 1,
+      "毎日": 1,
+      "素晴": 1,
+      "今": 1,
+      "体験": 1,
+      "感動": 1,
+      "健康": 1,
+      "美": 1,
+      "肌": 1
+    },
+    "top_bigrams": {
+      "しい": 2,
+      "新し": 1,
+      "い朝": 1,
+      "朝が": 1,
+      "が始": 1,
+      "始ま": 1,
+      "まる": 1,
+      "る一": 1,
+      "一杯": 1,
+      "杯の": 1
+    },
+    "top_trigrams": {
+      "新しい": 1,
+      "しい朝": 1,
+      "い朝が": 1,
+      "朝が始": 1,
+      "が始ま": 1,
+      "始まる": 1,
+      "まる一": 1,
+      "る一杯": 1,
+      "一杯の": 1,
+      "杯のコ": 1
+    },
+    "character_type_ratio": {
+      "hiragana_ratio": 0.05970149253731343,
+      "katakana_ratio": 0.05223880597014925,
+      "kanji_ratio": 0.3358208955223881,
+      "number_ratio": 0.014925373134328358,
+      "alphabet_ratio": 0.0
+    },
+    "rare_words": [
+      "コ",
+      "ヒ",
+      "新",
+      "朝",
+      "始",
+      "一杯",
+      "美味",
+      "続",
+      "年",
+      "毎日"
+    ]
+  },
+  "rhythm_analysis": {
+    "punctuation_frequency": {
+      "。。": 3,
+      "、。": 3,
+      "、！": 1,
+      "！。": 1
+    },
+    "ending_patterns": {
+      "まる": 1,
+      "から": 1,
+      "0年": 1,
+      "しく": 1,
+      "さい": 1,
+      "動を": 1,
+      "肌へ": 1,
+      "力で": 1,
+      "発売": 1,
+      "いを": 1
+    },
+    "sentence_length_distribution": {
+      "short": 9,
+      "medium": 3,
+      "long": 0
+    },
+    "avg_sentence_length": 10.166666666666666,
+    "rhythm_types": {
+      "体言止め": 5,
+      "疑問形": 6,
+      "感嘆形": 7,
+      "丁寧語": 4,
+      "短文連続": 4
+    },
+    "exclamation_ratio": 0.25,
+    "question_ratio": 0.0
+  },
+  "syntax_analysis": {
+    "sentence_patterns": {
+      "普通語": 7
+    },
+    "modifier_frequency": {
+      "新": 2,
+      "し": 6,
+      "い": 4,
+      "の": 5,
+      "ら": 2,
+      "美": 2,
+      "な": 4,
+      "素": 1,
+      "晴": 1,
+      "革": 1,
+      "的": 1
+    },
+    "conjunction_usage": {
+      "し": 6,
+      "ま": 1,
+      "の": 5,
+      "か": 1,
+      "ら": 2,
+      "だ": 2,
+      "り": 1,
+      "て": 2,
+      "な": 4,
+      "た": 1,
+      "で": 3,
+      "え": 1
+    },
+    "emphasis_patterns": {
+      "程度副詞": 7,
+      "感嘆符": 2,
+      "記号強調": 2
+    },
+    "complex_sentence_ratio": 0.75
+  },
+  "emotion_analysis": {
+    "emotion_scores": {
+      "positive": 1,
+      "negative": 0,
+      "urgency": 2,
+      "luxury": 2
+    },
+    "dominant_emotion": "urgency",
+    "tone_classification": {
+      "フォーマル": 7,
+      "論理的": 1,
+      "個人的": 4,
+      "感情的": 1
+    },
+    "emotional_intensity": 0.625
+  },
+  "dna_patterns": {
+    "vocabulary_dna": {
+      "signature_words": [
+        "な",
+        "が",
+        "ら",
+        "コ",
+        "ヒ"
+      ],
+      "vocabulary_richness_level": "高",
+      "preferred_bigrams": [
+        "しい",
+        "新し",
+        "い朝"
+      ]
+    },
+    "rhythm_dna": {
+      "preferred_sentence_length": "短文",
+      "dominant_rhythm": "感嘆形",
+      "punctuation_style": "標準"
+    },
+    "syntax_dna": {
+      "sentence_style": "普通語",
+      "complexity_level": "高",
+      "emphasis_preference": "程度副詞"
+    },
+    "emotion_dna": {
+      "emotional_tendency": "urgency",
+      "intensity_level": "中",
+      "tone_preference": "フォーマル"
+    },
+    "integrated_dna_profile": "高語彙×短文×urgencyトーン"
+  },
+  "insights": [
+    "短文主体のコンパクトなコピー",
+    "語彙の多様性が高く表現豊か",
+    "DNAプロファイル: 高語彙×短文×urgencyトーン"
+  ],
+  "success": true
+}

@@ -1,0 +1,191 @@
+{
+  "framework_info": {
+    "id": 12,
+    "name": "Copy DNA Audit",
+    "version": "1.0.0",
+    "component": "framework-creative",
+    "execution_time": 0.006849050521850586,
+    "timestamp": "2025-06-26T10:22:18.381502"
+  },
+  "input_parameters": {
+    "brand_name": "Sample Brand",
+    "copy_count": 8,
+    "sample_copies": [
+      "新しい朝は、新しいコーヒーから始まる。",
+      "今すぐ体験する、プレミアムな味わい。",
+      "あなたの毎日を、もっと豊かに。特別な一杯で。"
+    ]
+  },
+  "basic_statistics": {
+    "total_copies": 8,
+    "character_stats": {
+      "avg": 20.375,
+      "median": 19.5,
+      "min": 18,
+      "max": 23,
+      "std": 1.8666480653835098
+    },
+    "word_stats": {
+      "avg": 1.0,
+      "median": 1.0,
+      "std": 0.0
+    },
+    "sentence_stats": {
+      "avg": 2.125,
+      "median": 2.0,
+      "std": 0.33071891388307384
+    }
+  },
+  "vocabulary_analysis": {
+    "vocabulary_size": 36,
+    "total_words": 48,
+    "vocabulary_richness": 0.75,
+    "top_words": {
+      "ら": 3,
+      "な": 3,
+      "味": 3,
+      "コ": 2,
+      "ヒ": 2,
+      "新": 2,
+      "朝": 2,
+      "今": 2,
+      "届": 2,
+      "始": 1,
+      "プレミアム": 1,
+      "体験": 1,
+      "毎日": 1,
+      "豊": 1,
+      "特別": 1,
+      "一杯": 1,
+      "ブレンド": 1,
+      "限定": 1,
+      "特別価格": 1,
+      "スタ": 1
+    },
+    "top_bigrams": {
+      "しい": 4,
+      "新し": 2,
+      "い朝": 2,
+      "いコ": 2,
+      "コー": 2,
+      "ーヒ": 2,
+      "ヒー": 2,
+      "から": 2,
+      "する": 2,
+      "味わ": 2
+    },
+    "top_trigrams": {
+      "新しい": 2,
+      "しい朝": 2,
+      "いコー": 2,
+      "コーヒ": 2,
+      "ーヒー": 2,
+      "味わい": 2,
+      "お届け": 2,
+      "い朝は": 1,
+      "朝は新": 1,
+      "は新し": 1
+    },
+    "character_type_ratio": {
+      "hiragana": 0.04294478527607362,
+      "katakana": 0.09815950920245399,
+      "kanji": 0.31901840490797545,
+      "other": 0.5398773006134969
+    },
+    "rare_words": [
+      "始",
+      "プレミアム",
+      "体験",
+      "毎日",
+      "豊",
+      "特別",
+      "一杯",
+      "ブレンド",
+      "限定",
+      "特別価格"
+    ]
+  },
+  "rhythm_analysis": {
+    "syllable_stats": {
+      "avg": 2.875,
+      "median": 2.5,
+      "std": 2.1469455046647083
+    },
+    "punctuation_frequency": {
+      "avg": 2.125,
+      "total": 17
+    },
+    "rhythm_types": {
+      "short_burst": 5,
+      "medium_flow": 3,
+      "long_narrative": 0
+    },
+    "alliteration_score": 0.0,
+    "tempo_classification": "staccato"
+  },
+  "syntax_analysis": {
+    "sentence_length_stats": {
+      "avg": 17.11111111111111,
+      "median": 18.0,
+      "std": 4.55691036764664
+    },
+    "question_ratio": 0.0,
+    "exclamation_ratio": 0.0,
+    "rhetorical_devices": {
+      "repetition": 1,
+      "parallelism": 0,
+      "contrast": 0,
+      "metaphor": 0
+    },
+    "complex_sentence_ratio": 0.3333333333333333,
+    "syntax_variety_score": 0.6666666666666666
+  },
+  "emotion_analysis": {
+    "emotion_scores": {
+      "positive": 4,
+      "negative": 0,
+      "neutral": 0
+    },
+    "emotion_ratios": {
+      "positive": 1.0,
+      "negative": 0.0,
+      "neutral": 0.0
+    },
+    "urgency_score": 0.375,
+    "tone_classification": {
+      "formal": 1,
+      "casual": 0,
+      "urgent": 2,
+      "friendly": 0,
+      "professional": 0
+    },
+    "dominant_emotion": "positive"
+  },
+  "dna_patterns": {
+    "dna_signature": "rich_staccato_mixed_positive",
+    "profiles": {
+      "vocabulary": "rich",
+      "rhythm": "staccato",
+      "syntax": "mixed",
+      "emotion": "positive"
+    },
+    "feature_vector": {
+      "vocabulary_richness": 0.75,
+      "rhythm_tempo": 2.875,
+      "syntax_complexity": 0.3333333333333333,
+      "emotion_intensity": 1.0,
+      "urgency_level": 0.375
+    },
+    "pattern_strength": {
+      "consistency": 0.41230780087993846,
+      "distinctiveness": 0.9371202934759467,
+      "memorability": 0.5
+    },
+    "uniqueness_score": 0.6164760314519617
+  },
+  "insights": [
+    "語彙が豊富で、表現力に富んだコピーライティング",
+    "際立った特徴を持ち、競合との差別化が図られている"
+  ],
+  "success": true
+}
