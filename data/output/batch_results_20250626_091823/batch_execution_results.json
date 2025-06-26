@@ -1,0 +1,77 @@
+{
+  "batch_info": {
+    "runner_name": "Framework Batch Runner",
+    "version": "1.0.0",
+    "start_time": "2025-06-26T09:18:23.404740",
+    "priority_filter": "ready",
+    "target_count": 6,
+    "total_execution_time": 0.0004820823669433594
+  },
+  "framework_results": [
+    {
+      "framework_id": 5,
+      "framework_name": "Share of Search",
+      "script": "framework_05_share_of_search.py",
+      "success": false,
+      "execution_time": 3.886222839355469e-05,
+      "error": "スクリプトファイルが見つかりません: framework_05_share_of_search.py",
+      "exception": true
+    },
+    {
+      "framework_id": 12,
+      "framework_name": "Copy DNA Audit",
+      "script": "framework_12_copy_dna.py",
+      "success": false,
+      "execution_time": 6.9141387939453125e-06,
+      "error": "スクリプトファイルが見つかりません: framework_12_copy_dna.py",
+      "exception": true
+    },
+    {
+      "framework_id": 3,
+      "framework_name": "DBA Score",
+      "script": "framework_03_dba_score.py",
+      "success": false,
+      "execution_time": 5.9604644775390625e-06,
+      "error": "スクリプトファイルが見つかりません: framework_03_dba_score.py",
+      "exception": true
+    },
+    {
+      "framework_id": 2,
+      "framework_name": "CEP Distribution",
+      "script": "framework_02_cep_distribution.py",
+      "success": false,
+      "execution_time": 5.245208740234375e-06,
+      "error": "スクリプトファイルが見つかりません: framework_02_cep_distribution.py",
+      "exception": true
+    },
+    {
+      "framework_id": 13,
+      "framework_name": "Meme & Emoji Analysis",
+      "script": "framework_13_meme_emoji.py",
+      "success": false,
+      "execution_time": 5.9604644775390625e-06,
+      "error": "スクリプトファイルが見つかりません: framework_13_meme_emoji.py",
+      "exception": true
+    },
+    {
+      "framework_id": 1,
+      "framework_name": "Brand Key Analysis",
+      "script": "framework_01_brand_key.py",
+      "success": false,
+      "execution_time": 5.9604644775390625e-06,
+      "error": "スクリプトファイルが見つかりません: framework_01_brand_key.py",
+      "exception": true
+    }
+  ],
+  "summary": {
+    "total_frameworks": 6,
+    "successful_count": 0,
+    "failed_count": 6,
+    "success_rate": 0.0,
+    "total_execution_time": 6.890296936035156e-05,
+    "average_execution_time": 1.148382822672526e-05,
+    "fastest_framework": "CEP Distribution",
+    "slowest_framework": "Share of Search"
+  },
+  "errors": []
+}

@@ -1,0 +1,29 @@
+{
+  "framework_info": {
+    "id": 5,
+    "name": "Share of Search",
+    "version": "1.0.0",
+    "execution_time": 2.239703893661499,
+    "timestamp": "2025-06-26T09:14:32.402749"
+  },
+  "input_parameters": {
+    "brand_name": "コカコーラ",
+    "competitors": [
+      "ペプシ",
+      "伊右衛門",
+      "午後の紅茶"
+    ],
+    "category": "飲料",
+    "time_range": "today 12-m"
+  },
+  "share_of_search": {
+    "コカコーラ": 52.76905273598942,
+    "ペプシ": 13.473301372127624,
+    "伊右衛門": 14.99421391965614,
+    "午後の紅茶": 18.763431972226815
+  },
+  "trend_analysis": {
+    "コカコーラ": {
+      "direction": "stable",
+      "strength": NaN,
+      "recent_peak": 

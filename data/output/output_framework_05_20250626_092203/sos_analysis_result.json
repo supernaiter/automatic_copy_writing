@@ -1,0 +1,79 @@
+{
+  "framework_info": {
+    "id": 5,
+    "name": "Share of Search",
+    "version": "1.0.0",
+    "execution_time": 2.2105600833892822,
+    "timestamp": "2025-06-26T09:22:05.510135"
+  },
+  "input_parameters": {
+    "brand_name": "コカコーラ",
+    "competitors": [
+      "ペプシ",
+      "伊右衛門",
+      "午後の紅茶"
+    ],
+    "category": "飲料",
+    "time_range": "today 12-m"
+  },
+  "share_of_search": {
+    "コカコーラ": 52.77685950413223,
+    "ペプシ": 13.471074380165291,
+    "伊右衛門": 14.991735537190081,
+    "午後の紅茶": 18.760330578512395
+  },
+  "trend_analysis": {
+    "コカコーラ": {
+      "direction": "stable",
+      "strength": NaN,
+      "recent_peak": 100,
+      "recent_avg": 60.24528301886792
+    },
+    "ペプシ": {
+      "direction": "stable",
+      "strength": NaN,
+      "recent_peak": 29,
+      "recent_avg": 15.377358490566039
+    },
+    "伊右衛門": {
+      "direction": "stable",
+      "strength": NaN,
+      "recent_peak": 47,
+      "recent_avg": 17.11320754716981
+    },
+    "午後の紅茶": {
+      "direction": "stable",
+      "strength": NaN,
+      "recent_peak": 84,
+      "recent_avg": 21.41509433962264
+    }
+  },
+  "competitive_analysis": {
+    "brand_rank": 1,
+    "total_brands": 4,
+    "market_leader": "コカコーラ",
+    "brand_share": 52.77685950413223,
+    "leader_share": 52.77685950413223,
+    "gap_to_leader": 0,
+    "competitive_intensity": 4
+  },
+  "insights": [
+    "検索シェア1位はコカコーラで52.8%",
+    "激戦カテゴリ（10%以上シェアブランド多数）"
+  ],
+  "raw_data_info": {
+    "rows": 53,
+    "columns": [
+      "コカコーラ",
+      "ペプシ",
+      "伊右衛門",
+      "午後の紅茶",
+      "isPartial"
+    ],
+    "date_range": {
+      "start": "2024-06-23T00:00:00",
+      "end": "2025-06-22T00:00:00"
+    }
+  },
+  "success": true
+}
