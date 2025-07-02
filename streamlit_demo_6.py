@@ -601,7 +601,7 @@ def supports_json_mode(model: str) -> bool:
     unsupported_prefixes = ['o1-', 'o3-']
     return not any(prefix in model.lower() for prefix in unsupported_prefixes)
 
-def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9) -> Tuple[str, Dict]:
+def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9, stream_output: bool = False, stream_placeholder=None) -> Tuple[str, Dict]:
     """段階的コピー生成（JSON出力対応）"""
     openai.api_key = OPENAI_API_KEY
     
@@ -609,6 +609,10 @@ def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messa
     is_o1_pro = "o1-pro" in model.lower()
     is_o3_or_o1_other = any(prefix in model.lower() for prefix in ['o1-', 'o3-']) and not is_o1_pro
     use_json_mode = supports_json_mode(model)
+    
+    # ストリーム出力を要求された場合は JSON Mode を強制オフ
+    if stream_output:
+        use_json_mode = False
     
     # JSON出力用のプロンプト拡張
     json_instruction = """
@@ -671,23 +675,42 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
             new_user_message = {"role": "user", "content": f"{orientation}\n\n{stage_prompt}"}
             messages = [system_message] + conversation_messages + [new_user_message]
             
-            if use_json_mode:
-                response = openai.chat.completions.create(
+            # ストリーミング表示が必要かどうか
+            if stream_output and not use_json_mode:
+                streamed_text = ""
+                stream = openai.chat.completions.create(
                     model=model,
                     messages=messages,
                     max_tokens=3000,
                     temperature=temperature,
-                    response_format={"type": "json_object"}
+                    stream=True
                 )
+                for chunk in stream:
+                    delta = chunk.choices[0].delta.content or ""
+                    streamed_text += delta
+                    if stream_placeholder is not None:
+                        stream_placeholder.markdown(
+                            f'<div class="copy-display" style="max-height:400px;overflow-y:auto;white-space:pre-wrap;">{streamed_text}</div>',
+                            unsafe_allow_html=True
+                        )
+                response_text = streamed_text
             else:
-                response = openai.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=3000,
-                    temperature=temperature
-                )
-                
-            response_text = response.choices[0].message.content
+                if use_json_mode:
+                    response = openai.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        max_tokens=3000,
+                        temperature=temperature,
+                        response_format={"type": "json_object"}
+                    )
+                else:
+                    response = openai.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        max_tokens=3000,
+                        temperature=temperature
+                    )
+                response_text = response.choices[0].message.content
         
         # JSONをパースして表示用にフォーマット
         parsed_json = parse_json_response(response_text)
@@ -1126,13 +1149,16 @@ if generation_mode == "段階的生成":
                                     selected_copies_text = '\n'.join([f"• {copy}" for copy in selected_copies])
                                     enhanced_prompt += f"\n\n【参考】ユーザーが特に気に入っていたコピー：\n{selected_copies_text}\n\nこれらの方向性や表現スタイルも参考にしながら、新しいコピーを生成してください。"
                             
+                            placeholder_stage = st.empty()
                             with st.spinner(f"生成中... (使用モデル: {selected_model})"):
                                 result, parsed_json = generate_staged_copy(
                                     orientation, 
                                     enhanced_prompt, 
                                     st.session_state.conversation_history,
                                     selected_model,
-                                    temperature
+                                    temperature,
+                                    stream_output=True,
+                                    stream_placeholder=placeholder_stage
                                 )
                                 
                             # 実行結果を順番に追加
@@ -1199,13 +1225,17 @@ if generation_mode == "段階的生成":
                                 selected_copies_text = '\n'.join([f"• {copy}" for copy in selected_copies])
                                 enhanced_custom_prompt += f"\n\n【参考】ユーザーが特に気に入っていたコピー：\n{selected_copies_text}\n\nこれらの方向性や表現スタイルも参考にしながら、新しいコピーを生成してください。"
                         
+                        placeholder_custom = st.empty()
                         with st.spinner(f"生成中... (使用モデル: {selected_model})"):
-                            result, parsed_json = generate_custom_copy(
-                                orientation, 
-                                enhanced_custom_prompt, 
+                            # カスタムは JSON モードでない前提でストリーム
+                            result, parsed_json = generate_staged_copy(
+                                orientation,
+                                enhanced_custom_prompt,
                                 st.session_state.conversation_history,
                                 selected_model,
-                                temperature
+                                temperature,
+                                stream_output=True,
+                                stream_placeholder=placeholder_custom
                             )
                             
                         # カスタム実行結果を追加
@@ -1418,12 +1448,15 @@ if generation_mode == "段階的生成":
                 base_copies_text = latest_execution["result"]
                 with st.spinner("さらにコピーを磨いています..."):
                     stage2_prompt = "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて"
+                    placeholder_refine = st.empty()
                     formatted_refine, parsed_json_refine = generate_staged_copy(
                         orientation_for_refine,
                         stage2_prompt,
                         st.session_state.conversation_history,
                         selected_model,
-                        temperature
+                        temperature,
+                        stream_output=True,
+                        stream_placeholder=placeholder_refine
                     )
                 # 実行履歴へ追加
                 refine_execution = {
@@ -1502,13 +1535,16 @@ else:
                 
                 # 3段階を連続実行
                 for i, stage_info in enumerate(STAGED_PROMPTS, 1):
+                    placeholder_batch_stage = st.empty()
                     with st.spinner(f"生成中... (使用モデル: {selected_model})"):
                         result, parsed_json = generate_staged_copy(
                             orientation, 
                             stage_info['prompt'], 
                             st.session_state.batch_conversation_history,
                             selected_model,
-                            temperature
+                            temperature,
+                            stream_output=True,
+                            stream_placeholder=placeholder_batch_stage
                         )
                         
                         # プレースホルダーに最新結果を表示（上書き）
@@ -1544,13 +1580,16 @@ else:
             if st.button("💡 もう一声", key="batch_refine", type="primary"):
                 orientation_for_refine = orientation  # batch mode orientation is local
                 stage2_prompt = "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて"
+                placeholder_batch_refine = st.empty()
                 with st.spinner("さらにコピーを磨いています..."):
                     formatted_refine, parsed_json_refine = generate_staged_copy(
                         orientation_for_refine,
                         stage2_prompt,
                         st.session_state.batch_conversation_history,
                         selected_model,
-                        temperature
+                        temperature,
+                        stream_output=True,
+                        stream_placeholder=placeholder_batch_refine
                     )
                     result_placeholder.markdown(f'<div class="copy-display">{formatted_refine}</div>', unsafe_allow_html=True)
                     st.session_state.last_batch_result = formatted_refine
