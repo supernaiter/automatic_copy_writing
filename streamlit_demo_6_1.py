@@ -12,6 +12,43 @@ import os
 import json
 import time
 
+# =========================================
+# 共通デフォルトオリエンテーション文言
+# =========================================
+DEFAULT_ORIENTATION_TEXT = """アクエリアス 新キャンペーン開発オリエンテーション
+1. ブランドの根幹：私たちの存在意義（Why）
+
+アクエリアスが信じる世界
+
+「スポーツを通じて人々が自己実現し、より良い社会を作る」
+
+私たちは、スポーツが単なる競技や運動以上の価値を持つと信じています。
+
+
+それは：
+自分の限界に挑戦し、成長する機会
+仲間と共に目標に向かう絆
+努力が報われる喜び
+健康的な心と体を育む基盤
+
+2. ターゲットインサイト：現代の生活者が抱える真実
+2025年の日本における「スポーツする人」の多層的な姿
+A. アスリート層（競技者）
+表層ニーズ：パフォーマンスを最大化したい、疲労を早く回復したい
+深層ニーズ：努力が報われることを信じたい、自分の可能性を証明したい
+
+B. ウェルネス層（健康志向）
+表層ニーズ：健康的な習慣を続けたい、体型を維持したい
+深層ニーズ：自分をコントロールできている実感、小さな達成感の積み重ね
+
+C. コミュニティ層（つながり重視）
+表層ニーズ：仲間と楽しく運動したい、SNSでシェアしたい
+深層ニーズ：誰かと繋がっている実感、応援し合える関係性
+
+D. リカバリー層（メンタルヘルス重視）
+表層ニーズ：ストレス解消したい、リフレッシュしたい
+深層ニーズ：自分を大切にする時間、心の余裕を取り戻す"""
+
 # APIキー設定（Streamlit Secrets対応）
 try:
     OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
@@ -38,6 +75,12 @@ STAGED_PROMPTS = [
         "title": "✨ 最終洗練",
         "prompt": "最終的な二十個の案をそれぞれ意味が凝縮するように、短い言葉にリフレーズして",
         "description": "意味を凝縮した短いフレーズに最終調整"
+    },
+    {
+        "stage": 4,
+        "title": "🔥 さらなる強化",
+        "prompt": "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて",
+        "description": "さらに強いメッセージを生成"
     }
 ]
 
@@ -601,7 +644,7 @@ def supports_json_mode(model: str) -> bool:
     unsupported_prefixes = ['o1-', 'o3-']
     return not any(prefix in model.lower() for prefix in unsupported_prefixes)
 
-def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9, stream_output: bool = False, stream_placeholder=None) -> Tuple[str, Dict]:
+def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9) -> Tuple[str, Dict]:
     """段階的コピー生成（JSON出力対応）"""
     openai.api_key = OPENAI_API_KEY
     
@@ -609,10 +652,6 @@ def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messa
     is_o1_pro = "o1-pro" in model.lower()
     is_o3_or_o1_other = any(prefix in model.lower() for prefix in ['o1-', 'o3-']) and not is_o1_pro
     use_json_mode = supports_json_mode(model)
-    
-    # ストリーム出力を要求された場合は JSON Mode を強制オフ
-    if stream_output:
-        use_json_mode = False
     
     # JSON出力用のプロンプト拡張
     json_instruction = """
@@ -675,42 +714,23 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
             new_user_message = {"role": "user", "content": f"{orientation}\n\n{stage_prompt}"}
             messages = [system_message] + conversation_messages + [new_user_message]
             
-            # ストリーミング表示が必要かどうか
-            if stream_output and not use_json_mode:
-                streamed_text = ""
-                stream = openai.chat.completions.create(
+            if use_json_mode:
+                response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
                     max_tokens=3000,
                     temperature=temperature,
-                    stream=True
+                    response_format={"type": "json_object"}
                 )
-                for chunk in stream:
-                    delta = chunk.choices[0].delta.content or ""
-                    streamed_text += delta
-                    if stream_placeholder is not None:
-                        stream_placeholder.markdown(
-                            f'<div class="copy-display" style="max-height:400px;overflow-y:auto;white-space:pre-wrap;">{streamed_text}</div>',
-                            unsafe_allow_html=True
-                        )
-                response_text = streamed_text
             else:
-                if use_json_mode:
-                    response = openai.chat.completions.create(
-                        model=model,
-                        messages=messages,
-                        max_tokens=3000,
-                        temperature=temperature,
-                        response_format={"type": "json_object"}
-                    )
-                else:
-                    response = openai.chat.completions.create(
-                        model=model,
-                        messages=messages,
-                        max_tokens=3000,
-                        temperature=temperature
-                    )
-                response_text = response.choices[0].message.content
+                response = openai.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=3000,
+                    temperature=temperature
+                )
+                
+            response_text = response.choices[0].message.content
         
         # JSONをパースして表示用にフォーマット
         parsed_json = parse_json_response(response_text)
@@ -1095,14 +1115,7 @@ if generation_mode == "段階的生成":
     
     with col1:
         # デフォルトのオリエンテーション
-        default_orientation = """【課題商品・サービスの訴求したいポイント】
-ルイボスとグリーンルイボスの2種の茶葉をブレンドし、ルイボスティーらしい豊かな香り立ちがありながら、すっきりとした飲みやすさを実現。クセのあるイメージのルイボスティーですが、すっきりゴクゴク飲める味わいです。アレルギー特定原材料等28品目不使用、カフェインゼロなのに、ルイボスティーの豊かな香りですっきりリフレッシュ。仕事中、食中食後、喉が渇いたときなどさまざまなシーンでおすすめです。
-
-【今回、募集する作品に期待すること】
-「GREEN DA・KA・RA」は"やさしさ"を大事にした心とカラダにやさしいブランドです。数あるルイボスティーの中でも、「GREEN DA・KA・RA やさしいルイボス」を選びたくなる、やさしさのつまった表現アイディアを期待しています。
-
-【制作にあたっての注意事項】
-「GREEN DA・KA・RAブランドの愛嬌を大切にしながら表現を検討してください。「GREEN DA・KA・RA」は"やさしさ"を大事にした心とカラダにやさしいブランドです。数あるルイボスティーの中でも、「GREEN DA・KA・RA やさしいルイボス」を選びたくなる、やさしさのつまった表現アイディアを期待しています。今回のお題では、さまざまな生活シーンで水分補給をする20~30代男女をターゲットにします。ルイボスとグリーンルイボスの2種の茶葉をブレンドし、ルイボスティーらしい豊かな香り立ちがありながら、すっきりとした飲みやすさを実現。クセのあるイメージのルイボスティーですが、すっきりゴクゴク飲める味わいです。アレルギー特定原材料等28品目不使用、カフェインゼロなのに、ルイボスティーの豊かな香りですっきりリフレッシュ。仕事中、食中食後、喉が渇いたときなどさまざまなシーンでおすすめです。「GREEN DA・KA・RA」ブランドの愛嬌を大切にしながら表現を検討してください。"""
+        default_orientation = DEFAULT_ORIENTATION_TEXT
         
         # オリエンテーション入力エリア
         orientation = st.text_area(
@@ -1149,16 +1162,13 @@ if generation_mode == "段階的生成":
                                     selected_copies_text = '\n'.join([f"• {copy}" for copy in selected_copies])
                                     enhanced_prompt += f"\n\n【参考】ユーザーが特に気に入っていたコピー：\n{selected_copies_text}\n\nこれらの方向性や表現スタイルも参考にしながら、新しいコピーを生成してください。"
                             
-                            placeholder_stage = st.empty()
                             with st.spinner(f"生成中... (使用モデル: {selected_model})"):
                                 result, parsed_json = generate_staged_copy(
                                     orientation, 
                                     enhanced_prompt, 
                                     st.session_state.conversation_history,
                                     selected_model,
-                                    temperature,
-                                    stream_output=True,
-                                    stream_placeholder=placeholder_stage
+                                    temperature
                                 )
                                 
                             # 実行結果を順番に追加
@@ -1225,17 +1235,13 @@ if generation_mode == "段階的生成":
                                 selected_copies_text = '\n'.join([f"• {copy}" for copy in selected_copies])
                                 enhanced_custom_prompt += f"\n\n【参考】ユーザーが特に気に入っていたコピー：\n{selected_copies_text}\n\nこれらの方向性や表現スタイルも参考にしながら、新しいコピーを生成してください。"
                         
-                        placeholder_custom = st.empty()
                         with st.spinner(f"生成中... (使用モデル: {selected_model})"):
-                            # カスタムは JSON モードでない前提でストリーム
-                            result, parsed_json = generate_staged_copy(
-                                orientation,
-                                enhanced_custom_prompt,
+                            result, parsed_json = generate_custom_copy(
+                                orientation, 
+                                enhanced_custom_prompt, 
                                 st.session_state.conversation_history,
                                 selected_model,
-                                temperature,
-                                stream_output=True,
-                                stream_placeholder=placeholder_custom
+                                temperature
                             )
                             
                         # カスタム実行結果を追加
@@ -1448,15 +1454,12 @@ if generation_mode == "段階的生成":
                 base_copies_text = latest_execution["result"]
                 with st.spinner("さらにコピーを磨いています..."):
                     stage2_prompt = "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて"
-                    placeholder_refine = st.empty()
                     formatted_refine, parsed_json_refine = generate_staged_copy(
                         orientation_for_refine,
                         stage2_prompt,
                         st.session_state.conversation_history,
                         selected_model,
-                        temperature,
-                        stream_output=True,
-                        stream_placeholder=placeholder_refine
+                        temperature
                     )
                 # 実行履歴へ追加
                 refine_execution = {
@@ -1499,14 +1502,7 @@ else:
     
     with col1:
         # デフォルトのオリエンテーション
-        default_orientation_simple = """【課題商品・サービスの訴求したいポイント】
-ルイボスとグリーンルイボスの2種の茶葉をブレンドし、ルイボスティーらしい豊かな香り立ちがありながら、すっきりとした飲みやすさを実現。クセのあるイメージのルイボスティーですが、すっきりゴクゴク飲める味わいです。アレルギー特定原材料等28品目不使用、カフェインゼロなのに、ルイボスティーの豊かな香りですっきりリフレッシュ。仕事中、食中食後、喉が渇いたときなどさまざまなシーンでおすすめです。
-
-【今回、募集する作品に期待すること】
-「GREEN DA・KA・RA」は"やさしさ"を大事にした心とカラダにやさしいブランドです。数あるルイボスティーの中でも、「GREEN DA・KA・RA やさしいルイボス」を選びたくなる、やさしさのつまった表現アイディアを期待しています。
-
-【制作にあたっての注意事項】
-「GREEN DA・KA・RAブランドの愛嬌を大切にしながら表現を検討してください。「GREEN DA・KA・RA」は"やさしさ"を大事にした心とカラダにやさしいブランドです。数あるルイボスティーの中でも、「GREEN DA・KA・RA やさしいルイボス」を選びたくなる、やさしさのつまった表現アイディアを期待しています。今回のお題では、さまざまな生活シーンで水分補給をする20~30代男女をターゲットにします。ルイボスとグリーンルイボスの2種の茶葉をブレンドし、ルイボスティーらしい豊かな香り立ちがありながら、すっきりとした飲みやすさを実現。クセのあるイメージのルイボスティーですが、すっきりゴクゴク飲める味わいです。アレルギー特定原材料等28品目不使用、カフェインゼロなのに、ルイボスティーの豊かな香りですっきりリフレッシュ。仕事中、食中食後、喉が渇いたときなどさまざまなシーンでおすすめです。「GREEN DA・KA・RA」ブランドの愛嬌を大切にしながら表現を検討してください。"""
+        default_orientation_simple = DEFAULT_ORIENTATION_TEXT
         
         # オリエンテーション入力エリア
         orientation = st.text_area(
@@ -1534,30 +1530,27 @@ else:
                 st.session_state.batch_results = []
                 
                 # 3段階を連続実行
+                final_result = ""  # 最終結果のみ表示するために保持
                 for i, stage_info in enumerate(STAGED_PROMPTS, 1):
-                    placeholder_batch_stage = st.empty()
                     with st.spinner(f"生成中... (使用モデル: {selected_model})"):
                         result, parsed_json = generate_staged_copy(
                             orientation, 
                             stage_info['prompt'], 
                             st.session_state.batch_conversation_history,
                             selected_model,
-                            temperature,
-                            stream_output=True,
-                            stream_placeholder=placeholder_batch_stage
+                            temperature
                         )
-                        
-                        # プレースホルダーに最新結果を表示（上書き）
-                        result_placeholder.markdown(f'<div class="copy-display">{result}</div>', unsafe_allow_html=True)
+                        # 最終結果を保持（後でまとめて表示）
+                        final_result = result
                         
                         # 会話履歴と結果は必要に応じて保持
-                        st.session_state.batch_results = [{
+                        st.session_state.batch_results.append({
                             'stage': i,
                             'title': stage_info['title'],
                             'prompt': stage_info['prompt'],
                             'result': result,
                             'raw_json': parsed_json
-                        }]
+                        })
                         st.session_state.batch_conversation_history.append({
                             "role": "user", 
                             "content": stage_info['prompt']
@@ -1566,9 +1559,13 @@ else:
                             "role": "assistant", 
                             "content": result
                         })
-                        # 最新結果をセッションに保持
-                        st.session_state.last_batch_result = result
                 
+                # ループ完了後に最終結果のみを表示
+                if final_result:
+                    result_placeholder.markdown(f'<div class="copy-display">{final_result}</div>', unsafe_allow_html=True)
+                    # 最新結果をセッションに保持
+                    st.session_state.last_batch_result = final_result
+ 
                 # 初回や未生成時の案内
                 if not st.session_state.get('batch_results'):
                     st.info("「書いてみて」ボタンを押してコピーを生成してください")
@@ -1580,16 +1577,13 @@ else:
             if st.button("💡 もう一声", key="batch_refine", type="primary"):
                 orientation_for_refine = orientation  # batch mode orientation is local
                 stage2_prompt = "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて"
-                placeholder_batch_refine = st.empty()
                 with st.spinner("さらにコピーを磨いています..."):
                     formatted_refine, parsed_json_refine = generate_staged_copy(
                         orientation_for_refine,
                         stage2_prompt,
                         st.session_state.batch_conversation_history,
                         selected_model,
-                        temperature,
-                        stream_output=True,
-                        stream_placeholder=placeholder_batch_refine
+                        temperature
                     )
                     result_placeholder.markdown(f'<div class="copy-display">{formatted_refine}</div>', unsafe_allow_html=True)
                     st.session_state.last_batch_result = formatted_refine
