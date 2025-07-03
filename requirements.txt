@@ -14,3 +14,6 @@ python-dateutil>=2.9.0
 # Added from the code block
 openai>=1.3.0
 typing_extensions>=4.0.0
+
+# Added from the code block
+tiktoken
