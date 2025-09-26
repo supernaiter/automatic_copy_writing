@@ -1,0 +1,108 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Realtime: Mic → Text</title>
+<style>
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
+button { padding: .6rem 1rem; font-size: 1rem; }
+#log { white-space: pre-wrap; border: 1px solid #ddd; padding: 1rem; margin-top: 1rem; height: 240px; overflow: auto; }
+</style>
+<h1>Realtime: Mic → Text</h1>
+<p>
+  <button id="start">Start</button>
+  <button id="stop" disabled>Stop</button>
+</p>
+<div id="log"></div>
+<script>
+const log = (m) => { const el = document.getElementById('log'); el.textContent += m + "\n"; el.scrollTop = el.scrollHeight; };
+
+let pc, dc, micStream;
+
+function waitForIceGatheringComplete(pc) {
+  if (pc.iceGatheringState === 'complete') return Promise.resolve();
+  return new Promise((resolve) => {
+    function check() {
+      if (pc.iceGatheringState === 'complete') {
+        pc.removeEventListener('icegatheringstatechange', check);
+        resolve();
+      }
+    }
+    pc.addEventListener('icegatheringstatechange', check);
+  });
+}
+
+async function start() {
+  document.getElementById('start').disabled = true;
+  document.getElementById('stop').disabled = false;
+
+  const tokenResp = await fetch('/ephemeral', { method: 'POST' });
+  const { client_secret } = await tokenResp.json();
+
+  pc = new RTCPeerConnection();
+  pc.onconnectionstatechange = () => log('PC state: ' + pc.connectionState);
+  pc.oniceconnectionstatechange = () => log('ICE state: ' + pc.iceConnectionState);
+
+  dc = pc.createDataChannel('oai-events');
+  dc.onopen = () => log('DataChannel open');
+  let buffer = '';
+  dc.onmessage = (e) => {
+    try {
+      const obj = JSON.parse(e.data);
+      const t = obj.type || '';
+      log('[event] ' + t);
+      if (t === 'response.output_text.delta' || t === 'response.text.delta' || t === 'response.audio_transcript.delta') {
+        if (obj.delta) {
+          buffer += obj.delta;
+          // Show incremental line (last line updates)
+          const el = document.getElementById('log');
+          const lines = el.textContent.split('\n');
+          lines[lines.length - 1] = buffer; // replace last line with current buffer
+          el.textContent = lines.join('\n');
+          el.scrollTop = el.scrollHeight;
+        }
+      }
+      if (t === 'response.text.done' || t === 'response.audio_transcript.done' || t === 'response.done') {
+        buffer = '';
+      }
+    } catch {
+      log(e.data);
+    }
+  };
+
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  for (const track of micStream.getTracks()) pc.addTrack(track, micStream);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitForIceGatheringComplete(pc);
+
+  const sdp = await fetch('https://api.openai.com/v1/realtime?model=gpt-realtime', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${client_secret}`, 'Content-Type': 'application/sdp' },
+    body: pc.localDescription.sdp,
+  }).then(r => r.text());
+
+  await pc.setRemoteDescription({ type: 'answer', sdp });
+
+  log('Connected. Speak into your mic.');
+  // Trigger a text response proactively
+  if (dc && dc.readyState === 'open') {
+    dc.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: 'Transcribe user speech briefly and reply in concise text (ja ok).' } }));
+  } else {
+    dc.addEventListener('open', () => {
+      dc.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: 'Transcribe user speech briefly and reply in concise text (ja ok).' } }));
+    }, { once: true });
+  }
+}
+
+async function stop() {
+  document.getElementById('start').disabled = false;
+  document.getElementById('stop').disabled = true;
+  if (dc) dc.close();
+  if (pc) pc.close();
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+}
+
+document.getElementById('start').onclick = start;
+document.getElementById('stop').onclick = stop;
+</script>
+

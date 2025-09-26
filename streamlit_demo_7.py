@@ -19,6 +19,15 @@ except:
     # ローカル開発時は環境変数から取得
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-proj-your-api-key-here")
 
+
+def log_console(label: str, message: str) -> None:
+    formatted = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [{label}] {message}"
+    print(formatted)
+    if 'execution_log' not in st.session_state:
+        st.session_state.execution_log = []
+    st.session_state.execution_log.append(formatted)
+    st.session_state.execution_log = st.session_state.execution_log[-100:]
+
 # 段階的生成用のプロンプト定義（demo_3のシンプルで高品質なプロンプト）
 STAGED_PROMPTS = [
     {
@@ -176,15 +185,45 @@ def get_available_models() -> List[str]:
 def get_default_models() -> List[str]:
     """デフォルトモデルリスト"""
     return [
-        "gpt-4.1",
-        "gpt-4o",
-        "gpt-4o-mini"
+        "gpt-5",
+        "gpt-5-chat-latest",
+        "gpt-5-mini"
     ]
 
 def get_model_categories() -> Dict[str, Dict]:
     """モデル情報をカテゴリ別に整理"""
     return {
-        "🎯 標準GPTモデル（推奨）": {
+        "🔥 次世代GPT-5モデル（推奨）": {
+            "gpt-5": {
+                "price": "価格未公開",
+                "description": "🔥 最新GPT-5（最高品質・多用途）",
+                "use_case": "最高品質のコピー生成",
+                "recommended": True,
+                "note": "✅ Chat Completions API対応 (高精度)"
+            },
+            "gpt-5-chat-latest": {
+                "price": "価格未公開",
+                "description": "🆕 GPT-5 Chat最新版（継続アップデート）",
+                "use_case": "最新機能・迅速な改善反映",
+                "recommended": True,
+                "note": "✅ 常に最新の安定チャットモデル"
+            },
+            "gpt-5-mini": {
+                "price": "$1.00/$4.00",
+                "description": "⚡ GPT-5軽量版（高速・低コスト）",
+                "use_case": "大量処理やアイデアブレスト",
+                "recommended": True,
+                "note": "✅ Chat Completions API対応 (コスト効率重視)"
+            },
+            "gpt-5-nano": {
+                "price": "$0.35/$1.40",
+                "description": "💨 GPT-5ナノ版（超高速・バッチ処理向け）",
+                "use_case": "プロトタイピング、A/Bテスト",
+                "recommended": False,
+                "note": "ℹ️ 軽量版・最小コスト"
+            }
+        },
+        "🎯 GPT-4シリーズ": {
             "gpt-4o": {
                 "price": "$2.50/$10",
                 "description": "🎯 最新GPT-4（バランス型・安定）",
@@ -254,7 +293,16 @@ def display_model_selector() -> Tuple[str, str]:
             model_info = st.session_state.get('model_info', '')
         else:
             # デフォルト選択
-            if "gpt-4.1" in available_models:
+            if "gpt-5" in available_models:
+                selected_model = "gpt-5"
+                model_info = "🔥 最新GPT-5（最高品質・多用途）"
+            elif "gpt-5-chat-latest" in available_models:
+                selected_model = "gpt-5-chat-latest"
+                model_info = "🆕 GPT-5 Chat最新版（継続アップデート）"
+            elif "gpt-5-mini" in available_models:
+                model_info = "⚡ GPT-5軽量版（高速・低コスト）"
+                selected_model = "gpt-5-mini"
+            elif "gpt-4.1" in available_models:
                 selected_model = "gpt-4.1"
                 model_info = "🆕 次世代GPT（ベータ版）"
             elif "gpt-4o" in available_models:
@@ -273,7 +321,13 @@ def display_model_selector() -> Tuple[str, str]:
         # 全モデル一覧選択
         # デフォルトのインデックスを決定
         default_index = 0
-        if "gpt-4.1" in available_models:
+        if "gpt-5" in available_models:
+            default_index = available_models.index("gpt-5")
+        elif "gpt-5-chat-latest" in available_models:
+            default_index = available_models.index("gpt-5-chat-latest")
+        elif "gpt-5-mini" in available_models:
+            default_index = available_models.index("gpt-5-mini")
+        elif "gpt-4.1" in available_models:
             default_index = available_models.index("gpt-4.1")
         elif "gpt-4o" in available_models:
             default_index = available_models.index("gpt-4o")
@@ -342,90 +396,99 @@ def load_conversation_history(csv_file: str = None) -> List[Dict[str, str]]:
 
 def parse_json_response(response_text: str) -> Dict:
     """JSON形式のレスポンスをパースし、エラーハンドリングを行う"""
+    raw_text = response_text or ""
+    cleaned_text = raw_text.strip()
+
+    if not cleaned_text:
+        return {
+            "copies": [],
+            "raw_text": raw_text,
+            "error": "empty_response"
+        }
+
+    json_text = cleaned_text
+
+    if "```json" in cleaned_text:
+        json_start = cleaned_text.find("```json") + 7
+        json_end = cleaned_text.find("```", json_start)
+        json_text = cleaned_text[json_start:json_end].strip()
+    elif "{" in cleaned_text and "}" in cleaned_text:
+        json_start = cleaned_text.find("{")
+        json_end = cleaned_text.rfind("}") + 1
+        json_text = cleaned_text[json_start:json_end]
+
     try:
-        # JSONブロックが含まれている場合の抽出
-        if "```json" in response_text:
-            json_start = response_text.find("```json") + 7
-            json_end = response_text.find("```", json_start)
-            json_text = response_text[json_start:json_end].strip()
-        elif "{" in response_text and "}" in response_text:
-            # JSON部分のみを抽出
-            json_start = response_text.find("{")
-            json_end = response_text.rfind("}") + 1
-            json_text = response_text[json_start:json_end]
-        else:
-            json_text = response_text
-            
         parsed_data = json.loads(json_text)
+        if isinstance(parsed_data, dict):
+            parsed_data.setdefault("raw_text", raw_text)
         return parsed_data
-    except json.JSONDecodeError as e:
-        # JSON解析失敗時のデバッグ情報を表示
-        st.error(f"JSON解析エラー: {str(e)}")
-        with st.expander("⚠️ JSON解析エラーの詳細", expanded=False):
-            st.text("生レスポンス（最初の500文字）:")
-            st.text(response_text[:500])
-            st.text("抽出したJSON部分（最初の500文字）:")
-            if 'json_text' in locals():
-                st.text(json_text[:500])
-        
-        # フォールバック：テキストをそのまま返す
-        return {"copies": [response_text], "error": "JSON解析に失敗しました"}
+    except json.JSONDecodeError:
+        fallback_copies = [cleaned_text] if cleaned_text else []
+        return {
+            "copies": fallback_copies,
+            "raw_text": raw_text,
+            "error": "json_decode_failure"
+        }
 
 def format_copies_display(parsed_json: Dict) -> str:
     """パースされたJSONからコピーのみを抽出して表示用にフォーマット"""
-    if "error" in parsed_json:
-        return parsed_json.get("copies", ["エラーが発生しました"])[0]
-    
-    copies = []
-    
-    # 様々なJSON構造に対応
-    if "copies" in parsed_json:
-        if isinstance(parsed_json["copies"], list):
-            copies = parsed_json["copies"]
-        else:
-            copies = [str(parsed_json["copies"])]
-    elif "results" in parsed_json:
-        if isinstance(parsed_json["results"], list):
-            copies = parsed_json["results"]
-        else:
-            copies = [str(parsed_json["results"])]
-    elif "what_to_say" in parsed_json and "copies" in parsed_json:
-        # 段階1の構造化生成用
-        what_to_say = parsed_json.get("what_to_say", [])
-        copy_list = parsed_json.get("copies", [])
-        
-        formatted = "【What to Say（20案）】\n"
-        for i, wts in enumerate(what_to_say[:20], 1):
-            formatted += f"{i}. {wts}\n"
-        
-        formatted += "\n【コピー（20案）】\n"
-        for i, copy in enumerate(copy_list[:20], 1):
-            formatted += f"{i}. {copy}\n"
-        
-        return formatted
-    elif "refinements" in parsed_json:
-        # How to Say洗練用 - 洗練後のコピーのみ表示（番号なし）
-        refinements = parsed_json["refinements"]
-        copies = []
-        for refinement in refinements:
-            copy = refinement.get("copy", "")
-            if copy:
-                copies.append(copy)
-        
-        # シンプルに改行区切りで表示
+    copies: List[str] = []
+    raw_text = ""
+    error_flag = False
+
+    if isinstance(parsed_json, dict):
+        raw_text = parsed_json.get("raw_text", "")
+        error_flag = bool(parsed_json.get("error"))
+        if "copies" in parsed_json:
+            value = parsed_json.get("copies")
+            if isinstance(value, list):
+                copies = [str(item) for item in value if item]
+            elif isinstance(value, str):
+                copies = [value]
+        elif "results" in parsed_json:
+            value = parsed_json.get("results")
+            if isinstance(value, list):
+                copies = [str(item) for item in value if item]
+            elif isinstance(value, str):
+                copies = [value]
+        elif "what_to_say" in parsed_json and "copies" in parsed_json:
+            what_to_say = parsed_json.get("what_to_say") or []
+            copy_list = parsed_json.get("copies") or []
+            formatted = "【What to Say（20案）】\n"
+            for i, wts in enumerate(what_to_say[:20], 1):
+                formatted += f"{i}. {wts}\n"
+            formatted += "\n【コピー（20案）】\n"
+            for i, copy in enumerate(copy_list[:20], 1):
+                formatted += f"{i}. {copy}\n"
+            return formatted.strip()
+        elif "refinements" in parsed_json:
+            refinements = parsed_json.get("refinements") or []
+            copies = []
+            for refinement in refinements:
+                copy = refinement.get("copy")
+                if copy:
+                    copies.append(str(copy))
+
+    if not copies and raw_text:
+        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        copies = lines[:20]
+
+    if error_flag:
         if copies:
-            return "\n".join(copies)
+            print("[streamlit_demo_7] JSON parsing fallback succeeded; displaying fallback copies.")
         else:
-            return "洗練されたコピーが生成されませんでした"
-    else:
-        # その他の構造の場合、全体を文字列化
-        copies = [str(parsed_json)]
-    
-    # リスト形式の場合は番号付きで表示
+            print("[streamlit_demo_7] JSON parsing failed; displaying raw response text.")
+            return raw_text or "エラーが発生しました"
+
     if len(copies) > 1:
         return "\n".join([f"{i}. {copy}" for i, copy in enumerate(copies, 1)])
+    elif copies:
+        return copies[0]
     else:
-        return copies[0] if copies else "コピーが生成されませんでした"
+        if raw_text:
+            return raw_text
+        print("[streamlit_demo_7] No copies generated; returning fallback text.")
+        return "コピーが生成されませんでした"
 
 def extract_copies_list(parsed_json: Dict) -> List[str]:
     """パースされたJSONからコピーのリストを抽出"""
@@ -462,7 +525,18 @@ def extract_copies_list(parsed_json: Dict) -> List[str]:
     
     return copies
 
-def generate_feedback_based_copy(orientation: str, good_copies: List[str], bad_copies: List[str], conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9) -> str:
+
+def append_execution_log(message: str) -> None:
+    """実行ログをセッションに追記"""
+    timestamp = time.strftime("%H:%M:%S")
+    log_entry = {"time": timestamp, "message": message}
+    if 'execution_log' not in st.session_state:
+        st.session_state.execution_log = []
+    st.session_state.execution_log.append(log_entry)
+    # 最新50件に制限
+    st.session_state.execution_log = st.session_state.execution_log[-50:]
+
+def generate_feedback_based_copy(orientation: str, good_copies: List[str], bad_copies: List[str], conversation_messages: List[Dict], model: str = "gpt-5", temperature: float = 0.9) -> str:
     """ユーザーフィードバックを基にした自省的コピー生成"""
     openai.api_key = OPENAI_API_KEY
     
@@ -470,6 +544,8 @@ def generate_feedback_based_copy(orientation: str, good_copies: List[str], bad_c
     is_o1_pro = "o1-pro" in model.lower()
     is_o3_or_o1_other = any(prefix in model.lower() for prefix in ['o1-', 'o3-']) and not is_o1_pro
     use_json_mode = supports_json_mode(model)
+
+    temperature = normalize_temperature(model, temperature)
     
     # 自省プロンプトを構築
     good_copies_text = "\n".join([f"✅ {copy}" for copy in good_copies])
@@ -555,6 +631,8 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
             response_text = response.choices[0].message.content
         
         else:
+            temperature = normalize_temperature(model, temperature)
+
             system_message = {
                 "role": "system", 
                 "content": f"""あなたは優秀なコピーライターです。
@@ -575,7 +653,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_tokens=3000,
+                    max_completion_tokens=3000,
                     temperature=temperature,
                     response_format={"type": "json_object"}
                 )
@@ -583,7 +661,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_tokens=3000,
+                    max_completion_tokens=3000,
                     temperature=temperature
                 )
                 
@@ -601,7 +679,13 @@ def supports_json_mode(model: str) -> bool:
     unsupported_prefixes = ['o1-', 'o3-']
     return not any(prefix in model.lower() for prefix in unsupported_prefixes)
 
-def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9, stream_output: bool = False, stream_placeholder=None) -> Tuple[str, Dict]:
+def normalize_temperature(model: str, temperature: float) -> float:
+    """モデル制約に応じてTemperatureを調整"""
+    if model and model.lower().startswith("gpt-5"):
+        return 1.0
+    return temperature
+
+def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messages: List[Dict], model: str = "gpt-5", temperature: float = 0.9, stream_output: bool = False, stream_placeholder=None) -> Tuple[str, Dict]:
     """段階的コピー生成（JSON出力対応）"""
     openai.api_key = OPENAI_API_KEY
     
@@ -614,9 +698,10 @@ def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messa
     if stream_output:
         use_json_mode = False
     
+    temperature = normalize_temperature(model, temperature)
+
     # JSON出力用のプロンプト拡張
     json_instruction = """
-
 回答は必ずJSON形式で出力してください。以下の形式に従ってください：
 
 {
@@ -629,6 +714,16 @@ def generate_staged_copy(orientation: str, stage_prompt: str, conversation_messa
 
 what to sayは思考の過程として重要ですが、最終的なJSONには含めず、コピーのみを出力してください。
 JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力してください。"""
+
+    base_system_message = {
+        "role": "system",
+        "content": """あなたは優秀なコピーライターです。\n段階的にコピーを改善していきます。これまでの会話履歴を踏まえて、指示に従ってコピーを作成・改善してください。重要：生成するコピーは純粋なコピー文言のみを出力してください。説明文、分析、型番号、型名などの余計な情報は一切含めないでください。コピーは完成品として、そのまま広告として使えるものにしてください。""",
+    }
+
+    strict_json_system_message = {
+        "role": "system",
+        "content": json_instruction,
+    }
     
     try:
         if is_o1_pro:
@@ -665,15 +760,17 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
         
         else:
             # 標準GPTモデル用の処理
-            system_message = {
-                "role": "system", 
-                "content": f"""あなたは優秀なコピーライターです。
-段階的にコピーを改善していきます。これまでの会話履歴を踏まえて、指示に従ってコピーを作成・改善してください。
-重要：生成するコピーは純粋なコピー文言のみを出力してください。説明文、分析、型番号、型名などの余計な情報は一切含めないでください。コピーは完成品として、そのまま広告として使えるものにしてください。{json_instruction}"""
-            }
-            
+            system_messages: List[Dict[str, str]]
+            if model.lower().startswith("gpt-5"):
+                system_messages = [base_system_message, strict_json_system_message]
+            else:
+                system_messages = [{
+                    "role": "system",
+                    "content": base_system_message["content"] + "\n\n" + json_instruction
+                }]
+
             new_user_message = {"role": "user", "content": f"{orientation}\n\n{stage_prompt}"}
-            messages = [system_message] + conversation_messages + [new_user_message]
+            messages = system_messages + conversation_messages + [new_user_message]
             
             # ストリーミング表示が必要かどうか
             if stream_output and not use_json_mode:
@@ -686,7 +783,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 stream = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_tokens=3000,
+                    max_completion_tokens=3000,
                     temperature=temperature,
                     stream=True
                 )
@@ -731,7 +828,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                     response = openai.chat.completions.create(
                         model=model,
                         messages=messages,
-                        max_tokens=3000,
+                        max_completion_tokens=3000,
                         temperature=temperature,
                         response_format={"type": "json_object"}
                     )
@@ -739,11 +836,14 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                     response = openai.chat.completions.create(
                         model=model,
                         messages=messages,
-                        max_tokens=3000,
+                        max_completion_tokens=3000,
                         temperature=temperature
                     )
                 response_text = response.choices[0].message.content
-        
+
+        # Raw response logging for debugging
+        log_console("api", f"RAW RESPONSE (first 500 chars): {response_text[:500] if response_text else 'EMPTY RESPONSE'}")
+
         # ストリーム時はプレーンテキストを返す（JSON解析スキップ）
         if stream_output:
             return response_text, {}
@@ -756,7 +856,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
         error_msg = str(e)
         return f"エラーが発生しました: {error_msg}", {}
 
-def generate_how_to_say_refinement(copies: str, orientation: str, model: str = "gpt-4o", temperature: float = 0.9) -> str:
+def generate_how_to_say_refinement(copies: str, orientation: str, model: str = "gpt-5", temperature: float = 0.9) -> str:
     """HOW TO SAY型を使ってコピーを洗練（JSON出力対応）"""
     openai.api_key = OPENAI_API_KEY
     
@@ -831,6 +931,8 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
             response_text = response.choices[0].message.content
         
         else:
+            temperature = normalize_temperature(model, temperature)
+
             system_message = {
                 "role": "system", 
                 "content": f"""あなたは優秀なコピーライターです。
@@ -846,7 +948,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_tokens=3000,
+                    max_completion_tokens=3000,
                     temperature=temperature,
                     response_format={"type": "json_object"}
                 )
@@ -854,7 +956,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_tokens=3000,
+                    max_completion_tokens=3000,
                     temperature=temperature
                 )
             
@@ -866,7 +968,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
     except Exception as e:
         return f"エラーが発生しました: {str(e)}"
 
-def generate_custom_copy(orientation: str, custom_prompt: str, conversation_messages: List[Dict], model: str = "gpt-4o", temperature: float = 0.9) -> Tuple[str, Dict]:
+def generate_custom_copy(orientation: str, custom_prompt: str, conversation_messages: List[Dict], model: str = "gpt-5", temperature: float = 0.9) -> Tuple[str, Dict]:
     """カスタムプロンプトによるコピー生成（JSON出力対応）"""
     openai.api_key = OPENAI_API_KEY
     
@@ -921,6 +1023,8 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
             response_text = response.choices[0].message.content
         
         else:
+            temperature = normalize_temperature(model, temperature)
+
             system_message = {
                 "role": "system", 
                 "content": f"""あなたは優秀なコピーライターです。
@@ -940,7 +1044,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_tokens=3000,
+                    max_completion_tokens=3000,
                     temperature=temperature,
                     response_format={"type": "json_object"}
                 )
@@ -948,7 +1052,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_tokens=3000,
+                    max_completion_tokens=3000,
                     temperature=temperature
                 )
             
@@ -963,7 +1067,7 @@ JSON以外の説明や前置きは一切含めず、純粋なJSONのみを出力
         error_msg = str(e)
         return f"エラーが発生しました: {error_msg}", {}
 
-def generate_copy_ideas(orientation: str, csv_file: str = None, num_ideas: int = 5, model: str = "gpt-4o", temperature: float = 0.9) -> str:
+def generate_copy_ideas(orientation: str, csv_file: str = None, num_ideas: int = 5, model: str = "gpt-5", temperature: float = 0.9) -> str:
     """オリエンテーション + 会話履歴ベースのコピー生成（demo_3のシンプルアプローチ）"""
     openai.api_key = OPENAI_API_KEY
     
@@ -993,7 +1097,8 @@ def generate_copy_ideas(orientation: str, csv_file: str = None, num_ideas: int =
             response = openai.chat.completions.create(
                 model=model,
                 messages=messages,
-                max_completion_tokens=1200
+                max_completion_tokens=1200,
+                temperature=temperature
             )
             return response.choices[0].message.content
         
@@ -1017,7 +1122,7 @@ def generate_copy_ideas(orientation: str, csv_file: str = None, num_ideas: int =
             response = openai.chat.completions.create(
                 model=model,
                 messages=messages,
-                max_tokens=1200,
+                max_completion_tokens=1200,
                 temperature=temperature
             )
                 
@@ -1220,19 +1325,34 @@ if generation_mode == "段階的生成":
                                     selected_copies_text = '\n'.join([f"• {copy}" for copy in selected_copies])
                                     enhanced_prompt += f"\n\n【参考】ユーザーが特に気に入っていたコピー：\n{selected_copies_text}\n\nこれらの方向性や表現スタイルも参考にしながら、新しいコピーを生成してください。"
                             
+                            if 'main_display' not in st.session_state:
+                                st.session_state.main_display = st.empty()
                             result_placeholder = st.session_state.main_display
                             result_placeholder.empty()
                             result_placeholder.markdown("""<div class='skeleton'></div>""", unsafe_allow_html=True)
                             with st.spinner(f"生成中... (使用モデル: {selected_model})"):
                                 result, parsed_json = generate_staged_copy(
-                                    orientation, 
-                                    enhanced_prompt, 
+                                    orientation,
+                                    enhanced_prompt,
                                     st.session_state.conversation_history,
                                     selected_model,
                                     temperature,
-                                    stream_output=True,
+                                    stream_output=False,
                                     stream_placeholder=result_placeholder
                                 )
+
+                                # GPT-5が空レスポンスを返した場合、GPT-4oでフォールバック
+                                if selected_model.lower().startswith("gpt-5") and (not result or "エラーが発生しました" in result or len(result.strip()) < 50):
+                                    log_console("warning", f"GPT-5 failed with empty response, falling back to GPT-4o")
+                                    result, parsed_json = generate_staged_copy(
+                                        orientation,
+                                        enhanced_prompt,
+                                        st.session_state.conversation_history,
+                                        "gpt-4o",
+                                        temperature,
+                                        stream_output=False,
+                                        stream_placeholder=result_placeholder
+                                    )
                                 
                             # 実行結果を順番に追加
                             execution_result = {
@@ -1254,7 +1374,10 @@ if generation_mode == "段階的生成":
                                 "role": "assistant", 
                                 "content": result
                             })
-                            
+                            total_runs = len(st.session_state.execution_results)
+                            append_execution_log(f"{block_info['title']} を実行しました（合計 {total_runs} 件）")
+                            st.session_state.main_display.empty()
+                            st.session_state.main_display.info(f"{block_info['title']} の結果を更新しました（合計 {total_runs} 件）")
                             st.rerun()
                 
 
@@ -1298,6 +1421,8 @@ if generation_mode == "段階的生成":
                                 selected_copies_text = '\n'.join([f"• {copy}" for copy in selected_copies])
                                 enhanced_custom_prompt += f"\n\n【参考】ユーザーが特に気に入っていたコピー：\n{selected_copies_text}\n\nこれらの方向性や表現スタイルも参考にしながら、新しいコピーを生成してください。"
                         
+                        if 'main_display' not in st.session_state:
+                            st.session_state.main_display = st.empty()
                         result_placeholder = st.session_state.main_display
                         result_placeholder.empty()
                         result_placeholder.markdown("""<div class='skeleton'></div>""", unsafe_allow_html=True)
@@ -1309,7 +1434,7 @@ if generation_mode == "段階的生成":
                                 st.session_state.conversation_history,
                                 selected_model,
                                 temperature,
-                                stream_output=True,
+                                stream_output=False,
                                 stream_placeholder=result_placeholder
                             )
                             
@@ -1333,7 +1458,9 @@ if generation_mode == "段階的生成":
                             "role": "assistant", 
                             "content": result
                         })
-                        
+                        total_runs = len(st.session_state.execution_results)
+                        st.info(f"実行結果を更新しました（合計 {total_runs} 件）")
+
                         st.rerun()
                 
 
@@ -1363,6 +1490,8 @@ if generation_mode == "段階的生成":
 
     
     with col2:
+        if 'main_display' not in st.session_state:
+            st.session_state.main_display = st.empty()
         
         if st.session_state.execution_results:
             if len(st.session_state.execution_results) > 0:
@@ -1523,6 +1652,8 @@ if generation_mode == "段階的生成":
                 base_copies_text = latest_execution["result"]
                 with st.spinner("さらにコピーを磨いています..."):
                     stage2_prompt = "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて"
+                    if 'main_display' not in st.session_state:
+                        st.session_state.main_display = st.empty()
                     result_placeholder = st.session_state.main_display
                     result_placeholder.empty()
                     result_placeholder.markdown("""<div class='skeleton'></div>""", unsafe_allow_html=True)
@@ -1532,7 +1663,7 @@ if generation_mode == "段階的生成":
                         st.session_state.conversation_history,
                         selected_model,
                         temperature,
-                        stream_output=True,
+                        stream_output=False,
                         stream_placeholder=result_placeholder
                     )
                 # 実行履歴へ追加
@@ -1554,6 +1685,8 @@ if generation_mode == "段階的生成":
                     "role": "assistant",
                     "content": formatted_refine
                 })
+                total_runs = len(st.session_state.execution_results)
+                st.info(f"実行結果を更新しました（合計 {total_runs} 件）")
                 st.rerun()
             
             # 実行履歴をリストで表示
@@ -1598,7 +1731,9 @@ else:
         # 単一のメイン表示プレースホルダー
         if 'main_display' not in st.session_state:
             st.session_state.main_display = st.empty()
-        result_placeholder = st.session_state.main_display
+            if 'main_display' not in st.session_state:
+                st.session_state.main_display = st.empty()
+            result_placeholder = st.session_state.main_display
 
         # 前回生成済みの結果がある場合は表示
         if st.session_state.get('last_batch_result'):
@@ -1619,14 +1754,27 @@ else:
                     result_placeholder.markdown("""<div class='skeleton'></div>""", unsafe_allow_html=True)
                     with st.spinner(f"生成中... (使用モデル: {selected_model})"):
                         result, parsed_json = generate_staged_copy(
-                            orientation, 
-                            stage_info['prompt'], 
+                            orientation,
+                            stage_info['prompt'],
                             st.session_state.batch_conversation_history,
                             selected_model,
                             temperature,
-                            stream_output=True,
+                            stream_output=False,
                             stream_placeholder=result_placeholder
                         )
+
+                        # GPT-5が空レスポンスを返した場合、GPT-4oでフォールバック
+                        if selected_model.lower().startswith("gpt-5") and (not result or "エラーが発生しました" in result or len(result.strip()) < 50):
+                            log_console("warning", f"GPT-5 failed with empty response in stage {i}, falling back to GPT-4o")
+                            result, parsed_json = generate_staged_copy(
+                                orientation,
+                                stage_info['prompt'],
+                                st.session_state.batch_conversation_history,
+                                "gpt-4o",
+                                temperature,
+                                stream_output=False,
+                                stream_placeholder=result_placeholder
+                            )
                         
                         # 既存表示をリセットし Skeleton
                         result_placeholder.empty()
@@ -1648,8 +1796,9 @@ else:
                             "role": "assistant", 
                             "content": result
                         })
-                        # 最新結果をセッションに保持
-                        st.session_state.last_batch_result = result
+                    total_runs = len(st.session_state.batch_results)
+                    st.info(f"実行結果を更新しました（合計 {total_runs} 件）")
+                    st.session_state.last_batch_result = result
                 
                 # 初回や未生成時の案内
                 if not st.session_state.get('batch_results'):
@@ -1662,6 +1811,8 @@ else:
             if st.button("💡 もう一声", key="batch_refine", type="primary"):
                 orientation_for_refine = orientation  # batch mode orientation is local
                 stage2_prompt = "どれも広告的で心が動かない、もっと強いメッセージが必要。使い古された言い回しを使わずに、定型的な構文は避けて。二十個のコピーを考えて"
+                if 'main_display' not in st.session_state:
+                    st.session_state.main_display = st.empty()
                 result_placeholder = st.session_state.main_display
                 result_placeholder.empty()
                 result_placeholder.markdown("""<div class='skeleton'></div>""", unsafe_allow_html=True)
@@ -1672,7 +1823,7 @@ else:
                         st.session_state.batch_conversation_history,
                         selected_model,
                         temperature,
-                        stream_output=True,
+                        stream_output=False,
                         stream_placeholder=result_placeholder
                     )
                     result_placeholder.markdown(f'<div class="copy-display">{formatted_refine}</div>', unsafe_allow_html=True)
@@ -1696,6 +1847,8 @@ else:
                     "role": "assistant",
                     "content": formatted_refine
                 })
+                total_runs = len(st.session_state.batch_results)
+                st.info(f"実行結果を更新しました（合計 {total_runs} 件）")
                 st.rerun()
 
 st.sidebar.markdown("---")
