@@ -1,0 +1,11 @@
+project: automatic_copy_writing copy
+updated: 2026-04-27
+goal: automatic_copy_writing copy GitHub Issues 管理で最短前進
+
+[STATUS]
+done:
+  - [GH-000] git-pilot init
+pending:
+  - ready issue 整備
+next:
+  - [ ] GitHub issue 契約作成
